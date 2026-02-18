@@ -1,0 +1,14 @@
+ABC Patient Parameter File
+3.00.01
+Patient Last Name:DIWAKARA S SHETTY
+Patient First Name:.
+Patient Medical ID:7612024
+Date:10/16/2024 
+Threshold:-0.10
+Breath Hold Duration: 15 
+Y-Scale Range: 2 
+Trigger on Inhale:False
+X-Axis Scale: 1 
+X-Axis length: 1000 
+Gated:True
+Number Format:dot

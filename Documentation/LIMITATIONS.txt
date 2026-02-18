@@ -1,0 +1,380 @@
+================================================================================
+LIMITATIONS - What the System Cannot Do
+Breathing Patterns ML Project
+================================================================================
+
+ML MODEL LIMITATIONS
+--------------------
+
+NO DEEP LEARNING
+----------------
+✗ The system uses only classical ML algorithms:
+  - Random Forest
+  - Logistic Regression
+  - SVM
+  - XGBoost
+
+✗ Deep learning models NOT supported:
+  - No LSTM/RNN for sequence modeling
+  - No CNN for pattern recognition
+  - No Transformer models
+  - No neural networks
+
+Reason: Designed for interpretability and fast inference with classical ML.
+
+FIXED WINDOW SIZE
+-----------------
+✗ Window size is fixed per prediction session:
+  - Cannot adapt window size automatically
+  - No multi-scale window analysis
+  - No adaptive windowing based on breathing patterns
+
+✗ Must retrain models if changing window size significantly:
+  - Different window sizes = different feature distributions
+  - Models trained with 2s windows may not work well with 5s windows
+
+Workaround: Train separate models for different window sizes.
+
+SINGLE-TASK MODELS
+------------------
+✗ Each model handles only one task:
+  - Cannot do multi-task learning
+  - Must train separate models for breath_hold and gating_ok
+  - Cannot combine tasks in single model
+
+✗ No joint training:
+  - Tasks trained independently
+  - No shared feature representations
+
+PATIENT-BASED SPLITS REQUIREMENT
+---------------------------------
+✗ Requires multiple patients for training:
+  - Cannot train with single patient data
+  - Minimum 2-3 patients recommended
+  - Patient-based splits prevent using all data from one patient
+
+✗ Small datasets problematic:
+  - With few patients, train/test splits may be unbalanced
+  - Limited generalization evaluation
+
+CLASSICAL FEATURES ONLY
+-----------------------
+✗ Limited to engineered features:
+  - Only 11 window-based features
+  - No raw time-series modeling
+  - No frequency domain features (FFT)
+  - No advanced signal processing
+
+✗ Feature engineering is manual:
+  - Features must be explicitly defined
+  - Cannot learn features automatically (like deep learning)
+
+DATA LIMITATIONS
+----------------
+
+FILE FORMAT CONSTRAINTS
+-----------------------
+✗ Only supports specific formats:
+  - .dat files (with header structure)
+  - .txt files (semicolon-separated)
+  - .csv files (standard CSV)
+
+✗ Cannot handle:
+  - Excel files (.xlsx, .xls)
+  - JSON files
+  - Binary formats
+  - Compressed files (.zip, .gz)
+
+✗ Format requirements:
+  - Must have specific column names
+  - Header structure must match expected format
+  - Semicolon separator required for .dat/.txt
+
+REQUIRED COLUMNS
+----------------
+✗ Missing columns cause errors:
+  - Session Time (required)
+  - Volume (required)
+  - Balloon Valve Status (required for breath_hold task)
+  - Gating Mode (required for gating_ok task)
+
+✗ Cannot process files with:
+  - Different column names
+  - Missing required columns
+  - Incompatible data types
+
+DATA QUALITY ASSUMPTIONS
+------------------------
+✗ Assumes consistent sampling rate:
+  - Default: 50 Hz
+  - Files with different rates may have issues
+  - No automatic resampling
+
+✗ Assumes specific value ranges:
+  - Balloon Valve Status: 1, 2, 3, 4, or 5
+  - Patient Switch: 0 or 1
+  - Volume: Expected to be in liters (reasonable range)
+
+✗ Cannot handle:
+  - Irregular sampling intervals
+  - Missing timestamps
+  - Corrupted data sections
+  - Extreme outliers (may cause issues)
+
+INFERENCE LIMITATIONS
+---------------------
+
+NO REAL-TIME STREAMING
+----------------------
+✗ Cannot process live data streams:
+  - Requires complete files
+  - No real-time prediction
+  - No streaming inference
+
+✗ Batch processing only:
+  - Must upload complete files
+  - Cannot process partial data
+  - No incremental updates
+
+SINGLE FILE PROCESSING
+----------------------
+✗ Processes one file at a time (except batch page):
+  - Upload & Predict: One file
+  - Dataset Explorer: One file at a time
+  - No parallel processing of multiple files
+
+✗ Batch Analysis page:
+  - Processes sequentially (not parallel)
+  - May be slow for many files
+
+NO MODEL ENSEMBLING
+-------------------
+✗ Uses single best model:
+  - No ensemble predictions
+  - No voting across models
+  - No model averaging
+
+✗ Cannot combine:
+  - Multiple model predictions
+  - Different window sizes
+  - Different feature sets
+
+FRONTEND LIMITATIONS
+--------------------
+
+BROWSER REQUIREMENTS
+--------------------
+✗ Requires modern browser:
+  - May not work in very old browsers
+  - Requires JavaScript enabled
+  - Requires WebSocket support (for Streamlit)
+
+✗ No mobile optimization:
+  - Designed for desktop/laptop
+  - Mobile experience may be limited
+  - Touch interactions not optimized
+
+DISPLAY LIMITATIONS
+-------------------
+✗ Large datasets may be slow:
+  - Tables limited to 500 rows in UI
+  - Plots sampled to 15,000 points
+  - Very large files may cause performance issues
+
+✗ No advanced visualizations:
+  - Basic time-series plots only
+  - No 3D visualizations
+  - No advanced statistical plots
+
+NO OFFLINE MODE
+---------------
+✗ Requires running server:
+  - Cannot use without Streamlit server
+  - No standalone executable
+  - No offline desktop app
+
+✗ Internet not required, but:
+  - Must run local server
+  - Cannot use without Python/Streamlit installed
+
+USER INTERFACE LIMITATIONS
+---------------------------
+
+NO USER ACCOUNTS
+----------------
+✗ No authentication:
+  - No user login
+  - No access control
+  - No user preferences saved
+
+✗ No session persistence:
+  - Predictions not saved between sessions
+  - Must re-upload files
+  - No history of previous analyses
+
+LIMITED CUSTOMIZATION
+---------------------
+✗ Fixed UI layout:
+  - Cannot customize dashboard
+  - Cannot rearrange pages
+  - Limited theme options
+
+✗ Fixed parameters:
+  - Window size range: 1.0 to 5.0 seconds only
+  - Cannot use custom window sizes
+  - Limited model selection (uses best model)
+
+NO ADVANCED FILTERING
+---------------------
+✗ Basic file selection only:
+  - Cannot filter by date range
+  - Cannot filter by patient characteristics
+  - Cannot search files by name
+
+✗ No data filtering:
+  - Cannot exclude specific time ranges
+  - Cannot filter by volume ranges
+  - Cannot exclude outliers
+
+PERFORMANCE LIMITATIONS
+-----------------------
+
+MEMORY CONSTRAINTS
+------------------
+✗ Large files may cause issues:
+  - Very large files (>100MB) may be slow
+  - Memory usage scales with file size
+  - May cause browser slowdowns
+
+✗ Limited caching:
+  - Some data reloaded on page refresh
+  - No persistent cache across sessions
+
+PROCESSING SPEED
+----------------
+✗ Sequential processing:
+  - Batch files processed one at a time
+  - No parallel processing
+  - May be slow for many files
+
+✗ Model loading:
+  - Models loaded on first use
+  - May have slight delay on first prediction
+
+SCALABILITY LIMITATIONS
+-----------------------
+✗ Not designed for production scale:
+  - Single-user focused
+  - No database backend
+  - No distributed processing
+
+✗ Limited concurrent users:
+  - Streamlit handles limited concurrent sessions
+  - Not optimized for multiple simultaneous users
+
+INTEGRATION LIMITATIONS
+------------------------
+
+NO API ENDPOINTS
+---------------
+✗ No REST API:
+  - Cannot call from other applications
+  - No programmatic access (except Python imports)
+  - No webhooks or callbacks
+
+✗ Python API only:
+  - Must use Python to integrate
+  - Cannot integrate with non-Python systems
+  - No HTTP API endpoints
+
+NO DATABASE INTEGRATION
+-----------------------
+✗ No database:
+  - Files stored on filesystem only
+  - No database for metadata
+  - No query capabilities
+
+✗ No data persistence:
+  - Predictions not saved to database
+  - No historical tracking
+  - No audit logs
+
+LLM INTEGRATION LIMITATIONS
+---------------------------
+✗ Requires external LLM service:
+  - Needs Ollama API (or similar)
+  - Not included by default
+  - Requires API key/configuration
+
+✗ Limited to available LLM features:
+  - Depends on LLM capabilities
+  - May have rate limits
+  - Requires internet (if using cloud LLM)
+
+DOCUMENTATION LIMITATIONS
+-------------------------
+
+NO INTERACTIVE TUTORIALS
+------------------------
+✗ No built-in tutorials:
+  - Must read documentation files
+  - No step-by-step guided tours
+  - No interactive help system
+
+✗ Limited examples:
+  - Some usage examples in docs
+  - No sample datasets included
+  - No demo mode
+
+KNOWN ISSUES
+------------
+
+FILE PARSING
+------------
+⚠ Some edge cases in file parsing:
+  - Very long headers may cause issues
+  - Malformed semicolon separators
+  - Encoding issues with special characters
+
+WORKAROUND: Ensure files follow expected format.
+
+MODEL PERFORMANCE
+-----------------
+⚠ Performance depends on data quality:
+  - Poor quality data → poor predictions
+  - Imbalanced classes may affect metrics
+  - Small datasets may have high variance
+
+WORKAROUND: Ensure sufficient, high-quality training data.
+
+BROWSER COMPATIBILITY
+---------------------
+⚠ Some browsers may have issues:
+  - Very old browsers not supported
+  - Some mobile browsers may have limitations
+  - File upload size limits vary by browser
+
+WORKAROUND: Use modern, updated browsers.
+
+FUTURE ENHANCEMENTS (Not Currently Available)
+----------------------------------------------
+
+PLANNED BUT NOT IMPLEMENTED
+----------------------------
+- Deep learning models (LSTM, CNN)
+- Real-time streaming predictions
+- Advanced visualizations
+- Multi-task learning
+- Model ensembling
+- REST API endpoints
+- Database integration
+- User authentication
+- Mobile app
+- Advanced filtering
+- Custom feature engineering UI
+
+For workarounds and solutions to limitations, see TROUBLESHOOTING.txt
+
+================================================================================
+End of Limitations Guide
+================================================================================

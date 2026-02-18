@@ -1,0 +1,50 @@
+================================================================================
+OLLAMA MODELS - Best fit for this project
+================================================================================
+
+This project uses the LLM for:
+  - Explaining prediction results (short summaries, clinical interpretation)
+  - Answering questions about the dataset, models, and usage
+  - Generating reports (patient summary, prediction analysis, dataset overview)
+
+You want: good instruction following, fast responses, and modest RAM.
+
+RECOMMENDED (best fit)
+----------------------
+1. llama3.2:3b
+   - Best balance of speed and quality for this use case
+   - Explains and summarizes well; fast enough to avoid timeouts
+   - Install: ollama pull llama3.2:3b
+   - In config.py set: OLLAMA_MODEL = "llama3.2:3b"
+
+2. mistral (7b)
+   - Strong instruction following, efficient
+   - Slightly larger but still responsive
+   - Install: ollama pull mistral
+   - In config.py set: OLLAMA_MODEL = "mistral"
+
+FAST / LIGHT (if 3b is still slow or you have limited RAM)
+-----------------------------------------------------------
+3. llama3.2:1b
+   - Very fast, minimal RAM
+   - Install: ollama pull llama3.2:1b
+   - In config.py set: OLLAMA_MODEL = "llama3.2:1b"
+
+4. phi3:mini
+   - Good reasoning, small footprint
+   - Install: ollama pull phi3:mini
+   - In config.py set: OLLAMA_MODEL = "phi3:mini"
+
+ALREADY HAVE / MAX QUALITY (slower, needs more timeout)
+------------------------------------------------------
+5. llama3.1:8b (default in config)
+   - You already have this. Use if speed is acceptable
+   - If it times out, set OLLAMA_TIMEOUT = 300 in config.py
+   - Or switch to llama3.2:3b for faster replies
+
+QUICK CHOICE
+------------
+- Prefer speed and no timeouts:  ollama pull llama3.2:3b   then set OLLAMA_MODEL = "llama3.2:3b"
+- Prefer best answers, can wait: keep llama3.1:8b and set OLLAMA_TIMEOUT = 300
+
+After changing OLLAMA_MODEL in config.py, restart the Streamlit frontend.

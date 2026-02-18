@@ -1,0 +1,14 @@
+ABC Patient Parameter File
+3.00.01
+Patient Last Name:ABDUL REHAMAN N
+Patient First Name:.
+Patient Medical ID:7132024
+Date:9/24/2024 
+Threshold:-0.10
+Breath Hold Duration: 20 
+Y-Scale Range: 2 
+Trigger on Inhale:False
+X-Axis Scale: 1 
+X-Axis length: 1000 
+Gated:True
+Number Format:dot

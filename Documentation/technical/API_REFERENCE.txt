@@ -1,0 +1,351 @@
+================================================================================
+API REFERENCE - Python API Documentation
+Breathing Patterns ML Project
+================================================================================
+
+This document describes the Python API for programmatic use of the ML pipeline.
+
+DATA LOADING
+------------
+
+load_patient_file(file_path, patient_id=None, file_id=None)
+-----------------------------------------------------------
+Load a single breathing curve file.
+
+Parameters:
+  file_path: Path or str - Path to .dat, .txt, or .csv file
+  patient_id: str (optional) - Patient identifier
+  file_id: str (optional) - File identifier
+
+Returns:
+  pd.DataFrame - DataFrame with columns:
+    - Session Time (seconds)
+    - Volume (liters)
+    - Balloon Valve Status
+    - Patient Switch
+    - Gating Mode
+    - Gating Status
+    - Relay State
+    - patient_id (if provided)
+    - file_id (if provided)
+
+Example:
+  from src.load_data import load_patient_file
+  df = load_patient_file("dataset/PatientName/session1.dat", 
+                         patient_id="Patient1", file_id="session1")
+
+load_all_patients(dataset_dir, include_session_ini=False)
+---------------------------------------------------------
+Load all patient files from dataset directory.
+
+Parameters:
+  dataset_dir: Path or str - Path to dataset directory
+  include_session_ini: bool - Whether to parse session.ini files
+
+Returns:
+  Tuple[pd.DataFrame, Dict] - (DataFrame with all data, metadata dictionary)
+
+Example:
+  from src.load_data import load_all_patients
+  df, meta = load_all_patients("dataset")
+
+FEATURE ENGINEERING
+-------------------
+
+build_windows(df, window_sec=2.0, sample_rate_hz=50, min_rows=50)
+-----------------------------------------------------------------
+Build fixed-length time windows and extract features.
+
+Parameters:
+  df: pd.DataFrame - Input data with Session Time, Volume, etc.
+  window_sec: float - Window size in seconds (default: 2.0)
+  sample_rate_hz: float - Sampling rate in Hz (default: 50)
+  min_rows: int - Minimum rows per window (default: 50)
+
+Returns:
+  pd.DataFrame - DataFrame with one row per window:
+    - patient_id, file_id
+    - time_start, time_end
+    - vol_mean, vol_std, vol_min, vol_max, vol_range, vol_change, vol_rolling_mean
+    - frac_balloon_inflated, frac_balloon_deflated
+    - frac_patient_switch_on
+    - frac_gating_automated
+    - label_breath_hold, label_gating_ok
+
+Example:
+  from src.features import build_windows
+  windows = build_windows(df, window_sec=2.0)
+
+get_X_y(windows_df, task="breath_hold")
+---------------------------------------
+Extract features (X), labels (y), and patient IDs.
+
+Parameters:
+  windows_df: pd.DataFrame - Output from build_windows()
+  task: str - "breath_hold" or "gating_ok"
+
+Returns:
+  Tuple[pd.DataFrame, pd.Series, pd.Series] - (X features, y labels, patient_ids)
+
+Example:
+  from src.features import get_X_y
+  X, y, patient_ids = get_X_y(windows, task="breath_hold")
+
+LABEL EXTRACTION
+----------------
+
+balloon_to_breath_hold_label(balloon_status)
+---------------------------------------------
+Convert Balloon Valve Status to breath-hold labels.
+
+Parameters:
+  balloon_status: pd.Series - Balloon Valve Status values
+
+Returns:
+  pd.Series - Binary labels (1=breath-hold, 0=free-breathing)
+
+gating_mode_to_ok_label(gating_mode)
+------------------------------------
+Convert Gating Mode to OK/not OK labels.
+
+Parameters:
+  gating_mode: pd.Series - Gating Mode values
+
+Returns:
+  pd.Series - Binary labels (1=OK, 0=not OK)
+
+MODEL TRAINING
+--------------
+
+train_and_evaluate(X_train, y_train, X_test, y_test, ...)
+----------------------------------------------------------
+Train multiple models and evaluate performance.
+
+Parameters:
+  X_train: pd.DataFrame - Training features
+  y_train: pd.Series - Training labels
+  X_test: pd.DataFrame - Test features
+  y_test: pd.Series - Test labels
+  X_val: pd.DataFrame (optional) - Validation features
+  y_val: pd.Series (optional) - Validation labels
+  scale: bool - Whether to scale features (default: True)
+  random_state: int - Random seed (default: 42)
+
+Returns:
+  Tuple[Dict, Any, Any] - (metrics dict, best model, scaler)
+
+Example:
+  from src.train import train_and_evaluate
+  metrics, best_model, scaler = train_and_evaluate(X_train, y_train, X_test, y_test)
+
+patient_split(X, y, patient_ids, train_ratio=0.7, ...)
+-------------------------------------------------------
+Split data by patient (not by sample).
+
+Parameters:
+  X: pd.DataFrame - Features
+  y: pd.Series - Labels
+  patient_ids: pd.Series - Patient IDs
+  train_ratio: float - Training set ratio (default: 0.7)
+  val_ratio: float - Validation set ratio (default: 0.15)
+  test_ratio: float - Test set ratio (default: 0.15)
+  random_state: int - Random seed (default: 42)
+
+Returns:
+  Tuple of (X_train, X_val, X_test, y_train, y_val, y_test)
+
+INFERENCE
+---------
+
+predict_breathing_pattern(file_path, task="breath_hold", ...)
+--------------------------------------------------------------
+Get predictions for a breathing curve file.
+
+Parameters:
+  file_path: Path or str - Path to file
+  task: str - "breath_hold" or "gating_ok" (default: "breath_hold")
+  window_sec: float - Window size in seconds (default: 2.0)
+  patient_id: str - Patient identifier (default: "uploaded")
+  file_id: str - File identifier (default: "uploaded")
+
+Returns:
+  Tuple[pd.DataFrame, Dict] - (predictions DataFrame, metadata dict)
+
+Example:
+  from frontend.utils.inference import predict_breathing_pattern
+  windows_df, metadata = predict_breathing_pattern(
+      "path/to/file.dat",
+      task="breath_hold",
+      window_sec=2.0
+  )
+
+VISUALIZATION
+-------------
+
+plot_breathing_curve(df, predictions=None, ...)
+-------------------------------------------------
+Create interactive Plotly plot of breathing curve.
+
+Parameters:
+  df: pd.DataFrame - Input data
+  predictions: pd.DataFrame (optional) - Predictions DataFrame
+  show_balloon: bool - Show balloon valve overlay (default: True)
+  show_gating: bool - Show gating mode overlay (default: False)
+
+Returns:
+  plotly.graph_objects.Figure - Interactive plot
+
+Example:
+  from frontend.utils.visualization import plot_breathing_curve
+  fig = plot_breathing_curve(df, predictions=windows_df)
+  fig.show()
+
+plot_confusion_matrix(cm, model_name, labels=None)
+---------------------------------------------------
+Create confusion matrix visualization.
+
+Parameters:
+  cm: array-like - Confusion matrix (2x2)
+  model_name: str - Name of the model
+  labels: List[str] - Class labels (default: ["Class 0", "Class 1"])
+
+Returns:
+  plotly.graph_objects.Figure - Interactive plot
+
+plot_feature_importance(model, feature_names)
+----------------------------------------------
+Create feature importance visualization.
+
+Parameters:
+  model: sklearn model - Trained model with feature_importances_ or coef_
+  feature_names: List[str] - List of feature names
+
+Returns:
+  plotly.graph_objects.Figure - Interactive bar chart
+
+LLM INTEGRATION (Optional)
+---------------------------
+
+explain_prediction(predictions_df, model_info, task="breath_hold")
+------------------------------------------------------------------
+Generate AI explanation of predictions.
+
+Parameters:
+  predictions_df: pd.DataFrame - Predictions DataFrame
+  model_info: Dict - Model information (model_name, task, etc.)
+  task: str - Task name
+
+Returns:
+  str - Explanation text
+
+answer_question(question, context=None)
+---------------------------------------
+Answer a question using LLM.
+
+Parameters:
+  question: str - User's question
+  context: Dict (optional) - Context information
+
+Returns:
+  str - Answer text
+
+generate_report(analysis_data, report_type="patient_summary")
+--------------------------------------------------------------
+Generate analysis report using LLM.
+
+Parameters:
+  analysis_data: Dict - Analysis data dictionary
+  report_type: str - "patient_summary", "prediction_analysis", or "dataset_overview"
+
+Returns:
+  str - Generated report text
+
+UTILITY FUNCTIONS
+-----------------
+
+load_summary_stats()
+--------------------
+Load dataset summary statistics.
+
+Returns:
+  Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame] - (file_summary, patient_summary, other_files)
+
+get_patient_list()
+------------------
+Get list of all patients in dataset.
+
+Returns:
+  List[str] - List of patient folder names
+
+get_file_list(patient_id)
+--------------------------
+Get list of files for a patient.
+
+Parameters:
+  patient_id: str - Patient identifier
+
+Returns:
+  List[Tuple[str, Path]] - List of (file_id, file_path) tuples
+
+CONFIGURATION
+-------------
+
+All configuration is in config.py:
+
+DATASET_DIR: Path to dataset directory
+MODELS_DIR: Path to models directory
+WINDOW_SEC: Default window size (2.0 seconds)
+SAMPLE_RATE_HZ: Sampling rate (50 Hz)
+RANDOM_STATE: Random seed (42)
+TRAIN_RATIO: Training set ratio (0.7)
+VAL_RATIO: Validation set ratio (0.15)
+TEST_RATIO: Test set ratio (0.15)
+OLLAMA_API_URL: LLM API URL (if using LLM)
+OLLAMA_MODEL: LLM model name (if using LLM)
+
+COMPLETE EXAMPLE
+----------------
+
+from src.load_data import load_all_patients
+from src.features import build_windows, get_X_y
+from src.train import patient_split, train_and_evaluate
+import config as cfg
+
+# Load data
+df, meta = load_all_patients(cfg.DATASET_DIR)
+
+# Build features
+windows = build_windows(df, window_sec=cfg.WINDOW_SEC)
+
+# Extract features and labels
+X, y, patient_ids = get_X_y(windows, task="breath_hold")
+
+# Split by patient
+X_train, X_val, X_test, y_train, y_val, y_test = patient_split(
+    X, y, patient_ids,
+    train_ratio=cfg.TRAIN_RATIO,
+    val_ratio=cfg.VAL_RATIO,
+    test_ratio=cfg.TEST_RATIO,
+    random_state=cfg.RANDOM_STATE
+)
+
+# Train models
+metrics, best_model, scaler = train_and_evaluate(
+    X_train, y_train, X_test, y_test,
+    X_val=X_val, y_val=y_val,
+    scale=True,
+    random_state=cfg.RANDOM_STATE
+)
+
+# Print results
+print(f"Best model: {metrics['best_model']}")
+print(f"Balanced accuracy: {metrics['best_balanced_accuracy']:.4f}")
+
+For more details, see:
+- HOW_IT_WORKS.txt - Technical architecture
+- README_ML.md - ML pipeline documentation
+- src/ - Source code with docstrings
+
+================================================================================
+End of API Reference
+================================================================================

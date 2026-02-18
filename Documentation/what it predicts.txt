@@ -1,0 +1,211 @@
+================================================================================
+WHAT IT PREDICTS + HOW TO IMPROVE IT
+Breathing Patterns ML Project
+================================================================================
+
+1) WHAT THE PROJECT ACTUALLY PREDICTS
+=====================================
+
+This project currently predicts TWO binary (2-class) outcomes from breathing
+curve data used in radiation therapy gating:
+
+A) Breath-hold vs Free-breathing
+--------------------------------
+- Label 1 = Breath-hold (stable hold phase)
+- Label 0 = Free-breathing
+- Primary signal used: Balloon Valve Status
+	* 4 (inflated) -> breath-hold behavior
+	* 1 (deflated) -> free-breathing behavior
+
+B) Gating OK vs Not OK
+----------------------
+- Label 1 = Gating OK (Automated mode)
+- Label 0 = Gating Not OK (Manual override / non-automated)
+- Primary signal used: Gating Mode text
+	* "Automated" -> OK
+	* "Manual Overide/Override" -> Not OK
+
+Classification level:
+- Binary classification per task (2 classes each)
+- Models currently used: Random Forest, Logistic Regression, SVM, optional XGBoost
+
+
+2) WHAT OUTPUT YOU GET
+======================
+
+For each input file/session, the system outputs:
+
+- Window-level predictions (for each time window)
+- Class labels (0/1)
+- Confidence/probability-like scores (model dependent)
+- Performance metrics (when ground truth exists):
+	* Accuracy
+	* Balanced Accuracy
+	* F1 Score
+	* Confusion Matrix
+
+Also available via dashboard:
+- Per-file visual predictions over time
+- Dataset-level summaries
+- Batch analysis across many files
+
+
+3) HOW TO IMPROVE PREDICTION QUALITY (PRACTICAL)
+=================================================
+
+Priority 1: Improve data quality first
+--------------------------------------
+1. Remove/flag corrupted segments (sensor glitches, impossible jumps)
+2. Ensure consistent sampling behavior (target around configured 50 Hz)
+3. Validate required columns before training/inference
+4. Standardize text values (e.g., "Manual Overide" vs "Manual Override")
+5. Reduce label noise (verify Balloon/Gating status correctness)
+
+Priority 2: Strengthen training strategy
+----------------------------------------
+1. Keep patient-based split (do not mix same patient in train and test)
+2. Use cross-validation by patient groups
+3. Handle class imbalance (class weights / rebalancing)
+4. Tune hyperparameters instead of defaults only
+5. Optimize threshold for clinical objective (sensitivity vs specificity)
+
+Priority 3: Better feature engineering
+--------------------------------------
+1. Add frequency features (FFT / dominant breathing frequency)
+2. Add trend/shape features (slope, acceleration, entropy)
+3. Add robust stats (median, IQR, MAD) for noise tolerance
+4. Try multi-window features (1s, 2s, 4s together)
+5. Add quality flags as features (missingness, artifact score)
+
+Priority 4: Improve inference behavior
+--------------------------------------
+1. Add temporal smoothing to avoid rapid prediction flips
+2. Add low-confidence state ("uncertain") for unsafe predictions
+3. Use ensemble voting from top models
+4. Add per-patient calibration where sufficient patient history exists
+
+
+4) OPTIONS AND UPGRADE SUGGESTIONS
+==================================
+
+Option A: Stay Classical ML (fast + interpretable)
+---------------------------------------------------
+Best when:
+- Need fast inference
+- Need easy explanation to clinicians
+- Dataset size is moderate
+
+Upgrade suggestions:
+- Hyperparameter search (RF/SVM/XGB)
+- Better feature set and quality checks
+- Ensemble (RF + SVM + XGB)
+- Threshold tuning by clinical risk profile
+
+
+Option B: Hybrid Upgrade (recommended path)
+--------------------------------------------
+Best when:
+- You want better accuracy without full deep-learning complexity
+
+Upgrade suggestions:
+- Keep classical model as baseline + add one deep model (e.g., 1D-CNN)
+- Compare and combine using weighted voting
+- Use deep model only for difficult/low-confidence windows
+
+
+Option C: Deep Learning Upgrade (high potential)
+-------------------------------------------------
+Best when:
+- Larger dataset is available
+- GPU/compute is available
+- You can support more complex deployment
+
+Upgrade suggestions:
+- 1D-CNN for local breathing patterns
+- LSTM/GRU for temporal dependencies across windows
+- CNN-LSTM for combined local + sequence patterns
+- Transformer (later stage, with larger dataset)
+
+
+5) DATASET NEEDED FOR BETTER RESULTS
+====================================
+
+Minimum dataset (usable baseline):
+----------------------------------
+- 20-30 patients
+- Multiple sessions per patient
+- At least 500-1,000 valid windows per class
+- Balanced labels as much as possible
+
+Recommended dataset (strong model quality):
+-------------------------------------------
+- 80-150 patients
+- 5-20 sessions per patient
+- Diverse breathing behaviors:
+	* Stable breathing
+	* Irregular breathing
+	* Different breath-hold durations
+	* Manual override cases
+- Clean metadata and consistent schema
+
+Target for deep learning:
+-------------------------
+- 200+ patients (ideally more)
+- Large number of labeled windows per task
+- High label reliability (clinically reviewed subset)
+- Data from multiple machines/operators if possible
+
+
+6) REQUIRED COLUMNS / DATA FIELDS
+=================================
+
+Essential columns:
+- Session Time
+- Volume
+- Balloon Valve Status (for breath_hold task)
+- Gating Mode (for gating_ok task)
+
+Helpful additional fields:
+- Patient Switch
+- Gating Status
+- Relay State
+- Device/session metadata (machine id, protocol, operator)
+
+
+7) QUICK UPGRADE ROADMAP
+========================
+
+Phase 1 (Immediate):
+- Data cleaning + label audit
+- Hyperparameter tuning
+- Threshold optimization
+
+Phase 2 (Short-term):
+- Add frequency + robust features
+- Add ensemble + smoothing
+- Run patient-wise cross-validation
+
+Phase 3 (Medium-term):
+- Add 1D-CNN baseline
+- Compare classical vs deep vs hybrid
+- Deploy confidence-aware inference
+
+Phase 4 (Advanced):
+- LSTM/CNN-LSTM/Transformer exploration
+- Patient-specific adaptation
+- Real-time streaming integration
+
+
+8) BOTTOM LINE
+==============
+
+Current project already predicts:
+1) Breath-hold vs Free-breathing
+2) Gating OK vs Not OK
+
+To improve predictions most effectively:
+- First improve dataset quality and label quality
+- Then improve features + tuning + threshold strategy
+- Then move to hybrid/deep approaches as dataset scale grows
+
+================================================================================

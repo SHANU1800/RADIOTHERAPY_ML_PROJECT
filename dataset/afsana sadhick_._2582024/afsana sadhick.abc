@@ -1,0 +1,14 @@
+ABC Patient Parameter File
+3.00.01
+Patient Last Name:afsana sadhick
+Patient First Name:.
+Patient Medical ID:2582024
+Date:3/25/2024 
+Threshold:1.00
+Breath Hold Duration: 15 
+Y-Scale Range: 2 
+Trigger on Inhale:True
+X-Axis Scale: 1 
+X-Axis length: 1000 
+Gated:True
+Number Format:dot

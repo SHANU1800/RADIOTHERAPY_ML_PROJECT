@@ -1,0 +1,14 @@
+ABC Patient Parameter File
+3.00.01
+Patient Last Name:bharati naik
+Patient First Name:.
+Patient Medical ID:1332024
+Date:4/29/2024 
+Threshold:0.80
+Breath Hold Duration: 20 
+Y-Scale Range: 2 
+Trigger on Inhale:True
+X-Axis Scale: 1 
+X-Axis length: 1000 
+Gated:True
+Number Format:dot

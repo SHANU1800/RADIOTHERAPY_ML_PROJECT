@@ -1,0 +1,14 @@
+ABC Patient Parameter File
+3.00.01
+Patient Last Name:BENNY MARTIS
+Patient First Name:.
+Patient Medical ID:5482024
+Date:7/10/2024 
+Threshold:0.80
+Breath Hold Duration: 20 
+Y-Scale Range: 2 
+Trigger on Inhale:True
+X-Axis Scale: 1 
+X-Axis length: 1000 
+Gated:True
+Number Format:dot

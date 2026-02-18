@@ -1,0 +1,302 @@
+================================================================================
+HOW TO USE - Breathing Patterns ML Dashboard
+================================================================================
+
+QUICK START
+-----------
+1. Double-click "start.bat" (Windows) or run "bash quickstart.sh" (Linux/Mac)
+2. Wait for the web browser to open automatically
+3. The dashboard will be available at http://localhost:8501
+
+For first-time setup with dependency checks:
+- Double-click "quickstart.bat" (Windows)
+- This will check dependencies, run dataset analysis, and optionally train a model
+
+MANUAL STARTUP
+-------------
+If the batch files don't work:
+
+1. Open a terminal/command prompt
+2. Navigate to the project folder:
+   cd C:\Users\ritan\Desktop\KMCProject
+
+3. Install dependencies (if not already installed):
+   pip install -r requirements.txt
+
+4. Run dataset analysis (if not already done):
+   python analysis\analyze_dataset.py
+
+5. Train a model (if not already trained):
+   python -m src.train --task breath_hold
+
+6. Start the frontend:
+   python -m streamlit run run_frontend.py
+
+USING THE WEB DASHBOARD
+------------------------
+
+HOME PAGE
+---------
+The home page shows:
+- Total number of patients in the dataset
+- Total number of data files
+- Total recording duration
+- Model availability status
+- Quick model performance summary
+
+Use this page to get an overview of your dataset and check if models are trained.
+
+UPLOAD & PREDICT PAGE
+----------------------
+Steps to get predictions on a new file:
+
+1. Select Task:
+   - "breath_hold": Classify breath-hold vs free-breathing patterns
+   - "gating_ok": Classify gating OK vs not OK
+
+2. Adjust Window Size (optional):
+   - Default: 2.0 seconds
+   - Range: 1.0 to 5.0 seconds
+   - Smaller windows = more granular predictions
+   - Larger windows = smoother predictions
+
+3. Upload File:
+   - Click "Choose a file" button
+   - Select a .dat, .txt, or .csv breathing curve file
+   - Supported formats: .dat, .txt, .csv
+
+4. Enter Patient/File IDs (optional):
+   - Patient ID: Identifier for the patient (default: "uploaded")
+   - File ID: Identifier for the file (default: "uploaded")
+
+5. Click "Run Prediction":
+   - The file will be processed
+   - Predictions will be generated for each time window
+   - Results will be displayed with:
+     * Summary metrics (breath-hold windows, free-breathing windows, avg confidence)
+     * Interactive plot showing breathing curve with prediction overlays
+     * Table of window-level predictions
+     * Download button for CSV export
+
+6. Download Results:
+   - Click "Download Predictions CSV" to save results
+   - CSV contains: time windows, predictions, confidence scores, features
+
+DATASET EXPLORER PAGE
+----------------------
+Browse and visualize existing patient data:
+
+1. Select Patient:
+   - Choose from dropdown list of all patients in dataset/
+
+2. Select File:
+   - Choose a specific file for the selected patient
+   - Files are shown with their names
+
+3. View Statistics:
+   - Duration, row count, volume statistics
+   - Balloon valve status distribution
+   - Gating mode distribution
+
+4. Visualize Breathing Curve:
+   - Interactive plot showing volume over time
+   - Toggle options:
+     * Show Balloon Valve Status (overlay)
+     * Show Gating Mode (overlay)
+
+5. Compute Windows (optional):
+   - Adjust window size slider
+   - Click "Compute Windows" to see ground truth labels
+   - View window breakdown with breath-hold vs free-breathing counts
+
+MODEL PERFORMANCE PAGE
+----------------------
+View detailed model metrics:
+
+1. Model Comparison:
+   - See all trained models side-by-side
+   - Compare balanced accuracy and F1 scores
+
+2. Detailed Metrics Table:
+   - Accuracy, Balanced Accuracy, F1 Score for each model
+   - Best model is highlighted
+
+3. Confusion Matrices:
+   - Expand each model to see confusion matrix
+   - View True Positives, False Positives, True Negatives, False Negatives
+   - Interactive visualization
+
+4. Feature Importance:
+   - See which features are most important for predictions
+   - Visual bar chart (if model supports it)
+
+BATCH ANALYSIS PAGE
+-------------------
+Process multiple files at once:
+
+1. Select Task:
+   - Choose "breath_hold" or "gating_ok"
+
+2. Set Window Size:
+   - Adjust slider (default: 2.0 seconds)
+
+3. Upload Multiple Files:
+   - Click "Choose files"
+   - Select multiple .dat, .txt, or .csv files
+   - Hold Ctrl (Windows) or Cmd (Mac) to select multiple files
+
+4. Click "Process Batch":
+   - All files will be processed sequentially
+   - Progress bar shows completion status
+
+5. View Results:
+   - Summary table with per-file statistics
+   - Download combined CSV with all predictions
+
+AI ASSISTANT PAGE (if LLM integrated)
+--------------------------------------
+Ask questions and get explanations:
+
+1. Chat Interface:
+   - Type questions about predictions, models, or dataset
+   - Get AI-powered explanations
+
+2. Explain Predictions:
+   - Upload a file and get detailed explanation of predictions
+   - Understand why certain windows were classified as breath-hold
+
+3. Generate Reports:
+   - Create analysis reports for patient data
+   - Export reports as text or PDF
+
+COMMAND-LINE USAGE
+------------------
+
+TRAINING MODELS
+---------------
+Train a breath-hold classification model:
+  python -m src.train --task breath_hold
+
+Train a gating OK classification model:
+  python -m src.train --task gating_ok
+
+With custom parameters:
+  python -m src.train --task breath_hold --window-sec 3.0 --train-ratio 0.8 --seed 42
+
+Parameters:
+  --task: "breath_hold" or "gating_ok"
+  --dataset: Path to dataset directory (default: dataset/)
+  --window-sec: Window size in seconds (default: 2.0)
+  --train-ratio: Training set ratio (default: 0.7)
+  --seed: Random seed for reproducibility (default: 42)
+
+RUNNING DATASET ANALYSIS
+-------------------------
+Generate dataset summaries:
+  python analysis\analyze_dataset.py
+
+Outputs:
+  - analysis/output/file_summary.csv
+  - analysis/output/patient_summary.csv
+  - analysis/output/other_files.csv
+
+USING THE PYTHON API
+--------------------
+Load a single file:
+  from src.load_data import load_patient_file
+  df = load_patient_file("dataset/PatientName/file.dat")
+
+Load all patients:
+  from src.load_data import load_all_patients
+  df, meta = load_all_patients("dataset")
+
+Build features:
+  from src.features import build_windows, get_X_y
+  windows = build_windows(df, window_sec=2.0)
+  X, y, patient_ids = get_X_y(windows, task="breath_hold")
+
+Get predictions:
+  from frontend.utils.inference import predict_breathing_pattern
+  windows_df, metadata = predict_breathing_pattern(
+      "path/to/file.dat",
+      task="breath_hold",
+      window_sec=2.0
+  )
+
+FILE FORMAT REQUIREMENTS
+------------------------
+Supported formats: .dat, .txt, .csv
+
+Required columns:
+- Session Time (seconds)
+- Volume (liters)
+- Balloon Valve Status (1, 2, 3, 4, or 5)
+- Patient Switch (0 or 1)
+- Gating Mode (text: "Automated", "Manual Overide", etc.)
+
+For .dat and .txt files:
+- Header section (until "HeaderEnd" marker)
+- Semicolon-separated values after header
+- Standard column names expected
+
+For .csv files:
+- Standard CSV format
+- Column names in first row
+
+INTERPRETING RESULTS
+--------------------
+
+PREDICTIONS
+-----------
+- Prediction = 1: Breath-hold (or Gating OK, depending on task)
+- Prediction = 0: Free-breathing (or Gating Not OK)
+
+CONFIDENCE SCORES
+-----------------
+- Range: 0.0 to 1.0
+- Higher values = more confident prediction
+- Values > 0.7: High confidence
+- Values 0.5-0.7: Moderate confidence
+- Values < 0.5: Low confidence (may indicate uncertain patterns)
+
+WINDOW-BASED PREDICTIONS
+------------------------
+- Each prediction represents a time window (default: 2 seconds)
+- Windows are non-overlapping
+- Predictions are made independently for each window
+- Use window-level predictions to identify patterns over time
+
+VISUALIZATIONS
+-------------
+- Green rectangles: Predicted breath-hold windows
+- Red rectangles: Predicted free-breathing windows
+- Blue line: Volume curve over time
+- Hover over plot elements for detailed values
+
+TIPS FOR BEST RESULTS
+--------------------
+1. Use consistent window sizes when comparing files
+2. Check confidence scores - low confidence may indicate data quality issues
+3. Review ground truth labels in Dataset Explorer to understand patterns
+4. Train models with sufficient data (multiple patients recommended)
+5. Use patient-based splits (already implemented) to avoid data leakage
+6. For batch processing, ensure all files have similar formats
+
+TROUBLESHOOTING
+---------------
+If you encounter issues, see TROUBLESHOOTING.txt for detailed solutions.
+
+Common issues:
+- Model not found: Train a model first
+- File upload errors: Check file format matches requirements
+- Import errors: Make sure you're in the project root directory
+- Blank pages: Check browser console for errors
+
+For more help, see:
+- TROUBLESHOOTING.txt - Common errors and solutions
+- HOW_IT_WORKS.txt - Technical details
+- LIMITATIONS.txt - System constraints
+
+================================================================================
+End of How To Use Guide
+================================================================================

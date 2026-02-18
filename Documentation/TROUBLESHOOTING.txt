@@ -1,0 +1,501 @@
+================================================================================
+TROUBLESHOOTING - Common Errors and Solutions
+Breathing Patterns ML Project
+================================================================================
+
+INSTALLATION ISSUES
+-------------------
+
+ERROR: Python not found
+-----------------------
+Problem:
+  "python: command not found" or "Python is not installed"
+
+Solutions:
+1. Install Python 3.8 or higher from python.org
+2. Add Python to PATH during installation
+3. Verify installation: python --version
+4. On Windows, try "py" instead of "python"
+
+ERROR: pip not found
+--------------------
+Problem:
+  "pip: command not found"
+
+Solutions:
+1. Python 3.4+ includes pip by default
+2. If missing: python -m ensurepip --upgrade
+3. On Linux: sudo apt-get install python3-pip
+4. Verify: pip --version
+
+ERROR: Package installation fails
+----------------------------------
+Problem:
+  "ERROR: Could not install packages" or dependency conflicts
+
+Solutions:
+1. Update pip: pip install --upgrade pip
+2. Use virtual environment:
+   python -m venv venv
+   venv\Scripts\activate  (Windows)
+   source venv/bin/activate  (Linux/Mac)
+3. Install requirements: pip install -r requirements.txt
+4. If specific package fails, install individually:
+   pip install pandas numpy scikit-learn streamlit plotly
+
+ERROR: Permission denied (Linux/Mac)
+------------------------------------
+Problem:
+  "PermissionError" when installing packages
+
+Solutions:
+1. Use --user flag: pip install --user -r requirements.txt
+2. Use virtual environment (recommended)
+3. Use sudo (not recommended): sudo pip install -r requirements.txt
+
+DATASET ANALYSIS ISSUES
+------------------------
+
+ERROR: Dataset directory not found
+----------------------------------
+Problem:
+  "FileNotFoundError: Dataset directory not found"
+
+Solutions:
+1. Ensure dataset/ folder exists in project root
+2. Check current directory: cd to project root
+3. Verify path: analysis/analyze_dataset.py looks for ../dataset/
+4. Create dataset folder if missing: mkdir dataset
+
+ERROR: No files found in dataset
+---------------------------------
+Problem:
+  Analysis completes but shows 0 files
+
+Solutions:
+1. Check dataset/ contains patient folders
+2. Verify files have .dat, .txt, or .csv extensions
+3. Check file permissions (readable)
+4. Ensure files are not empty
+
+ERROR: File parsing errors
+--------------------------
+Problem:
+  "Error parsing file" or "Invalid format"
+
+Solutions:
+1. Check file format matches expected structure
+2. Verify header format (.dat/.txt files)
+3. Check column names match expected names
+4. Ensure semicolon separators (.dat/.txt)
+5. Check file encoding (should be UTF-8 or ASCII)
+6. Try opening file in text editor to inspect format
+
+MODEL TRAINING ISSUES
+---------------------
+
+ERROR: No model found
+----------------------
+Problem:
+  "Model not found" or "best_model.pkl not found"
+
+Solutions:
+1. Train a model first:
+   python -m src.train --task breath_hold
+2. Check models/ directory exists
+3. Verify training completed successfully
+4. Check for error messages during training
+
+ERROR: Training fails with "Not enough data"
+---------------------------------------------
+Problem:
+  "ValueError: Not enough samples" or "Empty dataset"
+
+Solutions:
+1. Ensure dataset/ contains data files
+2. Run dataset analysis: python analysis/analyze_dataset.py
+3. Check files have required columns
+4. Verify files are not empty
+5. Need at least 2-3 patients for patient-based splits
+
+ERROR: Training fails with memory error
+---------------------------------------
+Problem:
+  "MemoryError" or "Out of memory"
+
+Solutions:
+1. Reduce dataset size (use subset of patients)
+2. Increase window size (fewer windows = less memory)
+3. Close other applications
+4. Use smaller train/test split
+5. Process files in batches
+
+ERROR: Model performance is poor
+---------------------------------
+Problem:
+  Low accuracy or balanced accuracy < 0.6
+
+Solutions:
+1. Check data quality (run dataset analysis)
+2. Ensure sufficient training data (more patients)
+3. Try different window sizes
+4. Check for class imbalance (may need balancing)
+5. Verify labels are correct (check ground truth)
+6. Try different models (XGBoost often performs better)
+
+FRONTEND ISSUES
+---------------
+
+ERROR: Streamlit not found
+---------------------------
+Problem:
+  "streamlit: command not found"
+
+Solutions:
+1. Install Streamlit: pip install streamlit
+2. Verify: streamlit --version
+3. Check Python environment is activated
+
+ERROR: Cannot start frontend
+----------------------------
+Problem:
+  "Error starting Streamlit" or port already in use
+
+Solutions:
+1. Check if port 8501 is already in use
+2. Kill existing Streamlit process
+3. Use different port: streamlit run run_frontend.py --server.port 8502
+4. Check firewall settings
+5. Ensure you're in project root directory
+
+ERROR: Blank pages when navigating
+----------------------------------
+Problem:
+  Pages show blank/white screen when clicking navigation
+
+Solutions:
+1. Check browser console for errors (F12)
+2. Refresh the page (F5)
+3. Clear browser cache
+4. Try different browser
+5. Check that all page files exist in frontend/pages/
+6. Verify sys.path setup in each page file
+
+ERROR: Import errors in frontend
+--------------------------------
+Problem:
+  "ModuleNotFoundError" or "ImportError"
+
+Solutions:
+1. Ensure you're running from project root
+2. Check PROJECT_ROOT path in page files
+3. Verify all dependencies installed: pip install -r requirements.txt
+4. Check Python path: python -c "import sys; print(sys.path)"
+5. Restart Streamlit server
+
+FILE UPLOAD ISSUES
+------------------
+
+ERROR: File upload fails
+------------------------
+Problem:
+  "Error uploading file" or file not accepted
+
+Solutions:
+1. Check file format: must be .dat, .txt, or .csv
+2. Verify file size (very large files may fail)
+3. Check file is not corrupted
+4. Ensure file has required columns
+5. Try a different file to isolate issue
+
+ERROR: File parsing error after upload
+--------------------------------------
+Problem:
+  "Error processing file" or "Invalid format"
+
+Solutions:
+1. Verify file format matches expected structure
+2. Check column names match exactly
+3. Ensure .dat/.txt files have "HeaderEnd" marker
+4. Check semicolon separators (.dat/.txt)
+5. Verify file encoding (UTF-8 recommended)
+6. Try opening file in text editor to inspect
+
+ERROR: Predictions fail
+-----------------------
+Problem:
+  "Error running prediction" or "Model error"
+
+Solutions:
+1. Ensure model is trained: check models/best_model.pkl exists
+2. Verify model task matches selected task
+3. Check file has required columns
+4. Ensure window size is reasonable (1-5 seconds)
+5. Check for missing values in file
+6. Verify file has sufficient data (at least one window)
+
+PERFORMANCE ISSUES
+------------------
+
+PROBLEM: Slow page loading
+--------------------------
+Problem:
+  Pages take long time to load
+
+Solutions:
+1. Check dataset size (very large datasets may be slow)
+2. Clear browser cache
+3. Close other browser tabs
+4. Check system resources (CPU/memory)
+5. Reduce window size for faster processing
+6. Use smaller files for testing
+
+PROBLEM: Browser freezes
+------------------------
+Problem:
+  Browser becomes unresponsive
+
+Solutions:
+1. Check file size (very large files may cause issues)
+2. Plots are sampled to 15,000 points (automatic)
+3. Tables limited to 500 rows (automatic)
+4. Try smaller files
+5. Use CSV export for full data instead of viewing in UI
+6. Close other applications to free memory
+
+PROBLEM: Memory errors
+----------------------
+Problem:
+  "Out of memory" errors
+
+Solutions:
+1. Process smaller files
+2. Increase window size (fewer windows)
+3. Close other applications
+4. Restart browser
+5. Process files one at a time (not batch)
+
+BROWSER-SPECIFIC ISSUES
+-----------------------
+
+CHROME/EDGE ISSUES
+------------------
+Problem:
+  Various Chrome/Edge specific errors
+
+Solutions:
+1. Update browser to latest version
+2. Clear cache and cookies
+3. Disable extensions temporarily
+4. Try incognito mode
+5. Check Chrome console (F12) for errors
+
+FIREFOX ISSUES
+--------------
+Problem:
+  Firefox-specific errors
+
+Solutions:
+1. Update Firefox to latest version
+2. Clear cache (Ctrl+Shift+Delete)
+3. Disable add-ons temporarily
+4. Check Firefox console (F12) for errors
+5. Try Chrome/Edge as alternative
+
+SAFARI ISSUES
+-------------
+Problem:
+  Safari-specific errors
+
+Solutions:
+1. Update Safari to latest version
+2. Enable JavaScript (Settings > Advanced)
+3. Clear cache and cookies
+4. Try Chrome/Firefox as alternative
+5. Check Safari console (Develop menu)
+
+MOBILE BROWSER ISSUES
+---------------------
+Problem:
+  Issues on mobile browsers
+
+Solutions:
+1. Use desktop browser (recommended)
+2. Mobile experience is not optimized
+3. Try desktop mode on mobile
+4. Use laptop/desktop for best experience
+
+CONFIGURATION ISSUES
+--------------------
+
+ERROR: Config file not found
+----------------------------
+Problem:
+  "config.py not found" or import errors
+
+Solutions:
+1. Ensure config.py exists in project root
+2. Check you're running from project root
+3. Verify Python path includes project root
+4. Check file permissions
+
+ERROR: Path errors
+------------------
+Problem:
+  "FileNotFoundError" or path-related errors
+
+Solutions:
+1. Use absolute paths where possible
+2. Ensure you're in project root when running
+3. Check path separators (Windows: \, Linux/Mac: /)
+4. Verify dataset/ and models/ directories exist
+5. Check file permissions
+
+ERROR: Model file errors
+------------------------
+Problem:
+  "Error loading model" or pickle errors
+
+Solutions:
+1. Retrain model: python -m src.train --task breath_hold
+2. Check models/best_model.pkl exists and is not corrupted
+3. Verify Python version matches training version
+4. Check pickle protocol compatibility
+5. Delete corrupted model file and retrain
+
+QUICK START SCRIPT ISSUES
+-------------------------
+
+ERROR: Batch file doesn't run (Windows)
+----------------------------------------
+Problem:
+  Double-clicking .bat file doesn't work
+
+Solutions:
+1. Right-click → "Run as administrator"
+2. Check Python is in PATH
+3. Open command prompt and run manually
+4. Check file associations (.bat files)
+5. Try running from command prompt: quickstart.bat
+
+ERROR: Script stops at prompt
+-----------------------------
+Problem:
+  Script waits for user input indefinitely
+
+Solutions:
+1. Check for (y/n) prompts - answer y or n
+2. Check script syntax (no special characters in prompts)
+3. Run manually to see where it stops
+4. Check Python output for errors
+
+ERROR: Script fails silently
+----------------------------
+Problem:
+  Script runs but nothing happens
+
+Solutions:
+1. Run from command prompt to see errors
+2. Check Python is installed and in PATH
+3. Verify all dependencies installed
+4. Check script has correct paths
+5. Look for error messages in output
+
+LLM INTEGRATION ISSUES (if enabled)
+------------------------------------
+
+ERROR: LLM API not configured
+------------------------------
+Problem:
+  "LLM API not available" or connection errors
+
+Solutions:
+1. Configure Ollama API URL in config.py
+2. Ensure Ollama is running locally
+3. Check API endpoint is accessible
+4. Verify API key (if required)
+5. Check network connectivity
+
+ERROR: LLM responses fail
+--------------------------
+Problem:
+  "Error generating response" or timeouts
+
+Solutions:
+1. Check Ollama service is running
+2. Verify API endpoint is correct
+3. Check rate limits
+4. Try simpler questions
+5. Check API logs for errors
+
+GENERAL DEBUGGING TIPS
+----------------------
+
+CHECK LOGS
+----------
+1. Browser console (F12):
+   - Check for JavaScript errors
+   - Look for network errors
+   - Check console messages
+
+2. Python/Streamlit output:
+   - Check terminal where Streamlit is running
+   - Look for error messages
+   - Check traceback information
+
+3. File system:
+   - Verify all files exist
+   - Check file permissions
+   - Verify directory structure
+
+VERIFY SETUP
+------------
+1. Python version: python --version (need 3.8+)
+2. Dependencies: pip list (check all installed)
+3. Project structure: verify all folders exist
+4. Dataset: check dataset/ has patient folders
+5. Models: check models/ has trained models
+
+TEST COMPONENTS
+---------------
+1. Test dataset analysis:
+   python analysis/analyze_dataset.py
+
+2. Test model training:
+   python -m src.train --task breath_hold
+
+3. Test data loading:
+   python -c "from src.load_data import load_all_patients; print('OK')"
+
+4. Test frontend:
+   streamlit run run_frontend.py
+
+GET HELP
+--------
+1. Check documentation:
+   - HOW_TO_USE.txt
+   - HOW_IT_WORKS.txt
+   - LIMITATIONS.txt
+
+2. Review error messages carefully
+3. Check GitHub issues (if applicable)
+4. Verify system requirements met
+
+COMMON SOLUTIONS SUMMARY
+------------------------
+✓ Python not found → Install Python, add to PATH
+✓ Import errors → Install dependencies, check paths
+✓ Model not found → Train model first
+✓ File errors → Check format, columns, encoding
+✓ Blank pages → Refresh, check console, verify files
+✓ Slow performance → Use smaller files, increase window size
+✓ Memory errors → Process smaller batches, close apps
+
+For more details on system capabilities and limitations, see:
+- WHAT_IT_HAS.txt - Complete feature list
+- LIMITATIONS.txt - System constraints
+- HOW_IT_WORKS.txt - Technical details
+
+================================================================================
+End of Troubleshooting Guide
+================================================================================

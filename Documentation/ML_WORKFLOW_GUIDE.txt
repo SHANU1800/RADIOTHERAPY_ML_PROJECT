@@ -1,0 +1,382 @@
+================================================================================
+ML WORKFLOW GUIDE - How It Works & Adding New Data
+Breathing Patterns ML Project
+================================================================================
+
+HOW THE ML WORKS - STEP BY STEP
+--------------------------------
+
+STEP 1: DATA LOADING
+--------------------
+When you run training or prediction, the system:
+
+1. Scans the `dataset/` folder
+2. Finds all patient folders (each folder = one patient)
+3. Loads all .dat, .txt, and .csv files from each patient folder
+4. Parses files and creates a unified DataFrame with columns:
+   - Session Time (seconds)
+   - Volume (liters)
+   - Balloon Valve Status (1, 2, 3, 4, or 5)
+   - Patient Switch (0 or 1)
+   - Gating Mode (text: "Automated", "Manual Overide", etc.)
+   - Plus metadata: patient_id, file_id
+
+Example:
+  dataset/
+    Patient_A/
+      session1.dat
+      session2.dat
+    Patient_B/
+      session1.txt
+      session2.csv
+
+Result: One DataFrame with all data from all patients
+
+STEP 2: FEATURE ENGINEERING
+----------------------------
+The system converts raw time-series data into features:
+
+1. Creates time windows (default: 2 seconds each)
+   - At 50 Hz sampling rate = 100 samples per window
+   - Windows are non-overlapping (no overlap)
+
+2. For each window, calculates 11 features:
+   - Volume features (7):
+     * vol_mean: Average volume in window
+     * vol_std: Standard deviation (variability)
+     * vol_min: Minimum volume
+     * vol_max: Maximum volume
+     * vol_range: Max - min (amplitude)
+     * vol_change: Change from start to end
+     * vol_rolling_mean: Smoothed average
+   
+   - Balloon Valve features (2):
+     * frac_balloon_inflated: % of time status = 4 (breath-hold)
+     * frac_balloon_deflated: % of time status = 1 (free-breathing)
+   
+   - Patient Switch (1):
+     * frac_patient_switch_on: % of time switch is ON
+   
+   - Gating Mode (1):
+     * frac_gating_automated: % of time in "Automated" mode
+
+Example:
+  Raw data: 10,000 rows → ~100 windows (if 2 sec windows)
+  Each window → 11 features
+  Result: 100 rows × 11 features = feature matrix
+
+STEP 3: LABEL EXTRACTION
+-------------------------
+For each window, the system assigns a label based on the task:
+
+Task 1: Breath-hold vs Free-breathing
+  - Looks at Balloon Valve Status in the window
+  - If ANY sample has status = 4 (inflated) → Label = 1 (breath-hold)
+  - Otherwise → Label = 0 (free-breathing)
+
+Task 2: Gating OK vs Not OK
+  - Looks at Gating Mode in the window
+  - If ANY sample has "Automated" → Label = 1 (OK)
+  - Otherwise → Label = 0 (Not OK)
+
+Result: One label per window (0 or 1)
+
+STEP 4: PATIENT-BASED SPLIT
+----------------------------
+Critical: Splits are done by PATIENT, not by individual windows.
+
+Why? To prevent data leakage:
+  - Same patient's data should not appear in both train and test
+  - Ensures model generalizes to NEW patients
+
+Process:
+1. Groups all windows by patient_id
+2. Randomly assigns patients to sets:
+   - 70% patients → Training set
+   - 15% patients → Validation set
+   - 15% patients → Test set
+3. All windows from a patient go to the same set
+
+Example:
+  Patients: A, B, C, D, E, F, G, H, I, J (10 patients)
+  Split: A,B,C,D,E,F,G → Train (7 patients)
+         H,I → Val (2 patients)
+         J → Test (1 patient)
+  
+  Result: ~70% of windows in train, ~15% in val, ~15% in test
+
+STEP 5: MODEL TRAINING
+----------------------
+The system trains multiple models and picks the best:
+
+1. Random Forest:
+   - 100 decision trees
+   - Each tree votes on prediction
+   - Final prediction = majority vote
+   - Provides feature importance
+
+2. Logistic Regression:
+   - Linear classifier
+   - Fast and interpretable
+   - Good baseline
+
+3. Support Vector Machine (SVM):
+   - RBF kernel for non-linear patterns
+   - Good for complex boundaries
+
+4. XGBoost (if installed):
+   - Gradient boosting
+   - Often best performance
+   - Feature importance available
+
+Training Process:
+  - Each model trains on training set
+  - Evaluated on validation set (if available) and test set
+  - Metrics calculated: Accuracy, Balanced Accuracy, F1 Score
+  - Best model selected by Balanced Accuracy (accounts for class imbalance)
+
+STEP 6: MODEL EVALUATION
+-------------------------
+Metrics calculated for each model:
+
+- Accuracy: Overall correctness
+- Balanced Accuracy: Average of sensitivity and specificity (better for imbalanced data)
+- F1 Score: Harmonic mean of precision and recall
+- Confusion Matrix: Shows true/false positives/negatives
+
+Best model is saved with:
+  - The trained model
+  - The scaler (for feature normalization)
+  - Task name (breath_hold or gating_ok)
+
+STEP 7: INFERENCE (PREDICTIONS)
+--------------------------------
+When you upload a new file for prediction:
+
+1. File is loaded and parsed
+2. Windows are created (same process as training)
+3. Features are extracted (same 11 features)
+4. Features are scaled using the saved scaler
+5. Model predicts: 0 or 1 for each window
+6. Confidence scores calculated (probability)
+7. Results displayed with visualizations
+
+WHAT TO DO WHEN YOU HAVE MORE DATA
+===================================
+
+SCENARIO 1: Adding New Patient Data
+------------------------------------
+When you get new patient breathing curve files:
+
+1. ADD DATA TO DATASET:
+   - Create a new patient folder in `dataset/`
+   - Add patient's files (.dat, .txt, or .csv) to that folder
+   - Follow naming: `dataset/PatientName/` or `dataset/PatientName_ID/`
+
+   Example:
+     dataset/
+       Existing_Patient_A/
+         session1.dat
+       New_Patient_B/
+         session1.dat
+         session2.dat
+
+2. UPDATE DATASET ANALYSIS:
+   ```bash
+   python analysis/analyze_dataset.py
+   ```
+   This regenerates:
+   - analysis/output/file_summary.csv
+   - analysis/output/patient_summary.csv
+   - analysis/output/other_files.csv
+
+3. RETRAIN THE MODEL:
+   ```bash
+   python -m src.train --task breath_hold
+   ```
+   Or for gating_ok task:
+   ```bash
+   python -m src.train --task gating_ok
+   ```
+
+   Why retrain?
+   - New data improves model performance
+   - Model learns patterns from new patients
+   - Better generalization to unseen patients
+
+4. VERIFY RESULTS:
+   - Check new model metrics in `models/metrics.json`
+   - Compare with previous model performance
+   - Test predictions on new patient data
+
+SCENARIO 2: Adding More Files to Existing Patients
+---------------------------------------------------
+When you get more sessions for existing patients:
+
+1. ADD FILES:
+   - Add new files to existing patient folders
+   - Example: `dataset/Patient_A/session3.dat`, `session4.dat`
+
+2. UPDATE ANALYSIS:
+   ```bash
+   python analysis/analyze_dataset.py
+   ```
+
+3. RETRAIN MODEL:
+   ```bash
+   python -m src.train --task breath_hold
+   ```
+   
+   Note: Patient-based split ensures same patient's data stays together
+   - All files from Patient_A will be in same set (train/val/test)
+   - This is correct - prevents data leakage
+
+SCENARIO 3: Incremental Training (Not Currently Supported)
+----------------------------------------------------------
+Current system: Full retraining required
+- Each training run uses ALL data in dataset/
+- Old model is replaced with new model
+- This is standard for classical ML
+
+Future enhancement: Could add incremental learning
+- Update model with new data without full retrain
+- Requires more complex implementation
+
+BEST PRACTICES FOR ADDING DATA
+-------------------------------
+
+1. DATA QUALITY:
+   - Ensure files have required columns
+   - Check for missing values or corrupted data
+   - Verify file formats match expected structure
+
+2. PATIENT ORGANIZATION:
+   - One folder per patient
+   - Consistent naming convention
+   - Avoid duplicate patient names (use IDs if needed)
+
+3. DATA BALANCE:
+   - Try to have balanced classes (breath-hold vs free-breathing)
+   - More data generally = better model
+   - Minimum: 2-3 patients for patient-based splits
+
+4. REGULAR RETRAINING:
+   - Retrain when you add significant new data
+   - Retrain if model performance degrades
+   - Keep track of model versions/metrics
+
+5. VALIDATION:
+   - Always check model metrics after retraining
+   - Test on held-out test set
+   - Compare with previous model performance
+
+WORKFLOW EXAMPLE: Adding 5 New Patients
+----------------------------------------
+
+1. Add data:
+   ```
+   dataset/
+     New_Patient_1/
+       session1.dat
+     New_Patient_2/
+       session1.dat
+       session2.dat
+     ... (3 more patients)
+   ```
+
+2. Update analysis:
+   ```bash
+   python analysis/analyze_dataset.py
+   ```
+   Check: analysis/output/patient_summary.csv shows new patients
+
+3. Retrain model:
+   ```bash
+   python -m src.train --task breath_hold
+   ```
+   
+   Output shows:
+   - "Loaded X rows, Y patients" (should include new patients)
+   - "Built Z windows"
+   - "Train A, Val B, Test C samples"
+   - Model metrics
+
+4. Check results:
+   - models/metrics.json: Best model and accuracy
+   - models/metrics_models.json: All model comparisons
+   - models/best_model.pkl: New trained model
+
+5. Test predictions:
+   - Use frontend to upload a file from new patient
+   - Verify predictions make sense
+   - Check confidence scores
+
+MONITORING MODEL PERFORMANCE
+-----------------------------
+
+After adding data and retraining, check:
+
+1. Balanced Accuracy:
+   - Should improve or stay stable
+   - If decreases, investigate data quality
+
+2. Class Distribution:
+   - Check if classes are balanced
+   - Imbalanced data may need balancing techniques
+
+3. Patient Distribution:
+   - Ensure patients are distributed across train/val/test
+   - Very few patients → unbalanced splits
+
+4. Feature Importance:
+   - View in Model Performance page
+   - Check if important features make clinical sense
+
+TROUBLESHOOTING
+---------------
+
+Problem: Model performance decreases after adding data
+Solution:
+  - Check new data quality
+  - Verify labels are correct
+  - Check for class imbalance
+  - Ensure patient-based splits are working correctly
+
+Problem: Training fails with "Not enough data"
+Solution:
+  - Ensure at least 2-3 patients
+  - Check files have required columns
+  - Verify data is not empty
+
+Problem: Predictions don't make sense
+Solution:
+  - Retrain model with new data
+  - Check if data format matches training data
+  - Verify model task matches prediction task
+
+QUICK REFERENCE
+---------------
+
+Add new data:
+  1. Put files in dataset/PatientName/
+  2. python analysis/analyze_dataset.py
+  3. python -m src.train --task breath_hold
+
+Check current dataset:
+  - analysis/output/patient_summary.csv
+  - analysis/output/file_summary.csv
+
+View model performance:
+  - models/metrics.json
+  - Frontend: Model Performance page
+
+Test predictions:
+  - Frontend: Upload & Predict page
+  - Upload a file and check predictions
+
+================================================================================
+For more details, see:
+- HOW_IT_WORKS.txt - Technical architecture
+- README_ML.md - ML pipeline documentation
+- HOW_TO_USE.txt - User guide
+================================================================================

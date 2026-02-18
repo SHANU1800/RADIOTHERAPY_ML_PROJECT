@@ -1,0 +1,48 @@
+========================================
+  BREATHING PATTERNS ML PROJECT
+  Quick Start Guide
+========================================
+
+TO START THE FRONTEND DASHBOARD:
+
+Windows:
+  - Double-click: start.bat   (starts frontend only, no checks)
+  - Double-click: quickstart.bat   (checks deps, dataset, model; may prompt to train)
+  OR
+  - Right-click quickstart.ps1 → Run with PowerShell
+
+Linux/Mac:
+  - Run: bash quickstart.sh
+
+The script will:
+  1. Install dependencies (if needed)
+  2. Check dataset analysis
+  3. Check for trained model (prompts if missing)
+  4. Start the web dashboard
+
+The dashboard will open automatically in your browser!
+
+========================================
+
+MANUAL COMMANDS (if needed):
+
+Install dependencies:
+  pip install -r requirements.txt
+
+Run analyzer:
+  python analysis/analyze_dataset.py
+
+Train model:
+  python -m src.train --task breath_hold
+
+Start frontend:
+  streamlit run run_frontend.py
+
+========================================
+
+For more details, see:
+  - QUICKSTART.md (detailed guide)
+  - README_ML.md (ML pipeline docs)
+  - frontend/README.md (frontend docs)
+
+========================================

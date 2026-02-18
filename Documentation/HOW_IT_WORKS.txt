@@ -1,0 +1,380 @@
+================================================================================
+HOW IT WORKS - Technical Architecture
+Breathing Patterns ML Project
+================================================================================
+
+OVERVIEW
+--------
+This project uses classical machine learning (no deep learning) to classify
+breathing patterns in radiation therapy gating data. The system consists of:
+1. Data loading and preprocessing pipeline
+2. Feature engineering (window-based statistics)
+3. Model training with patient-based splits
+4. Web dashboard for inference and visualization
+5. LLM integration for explanations (optional)
+
+ARCHITECTURE DIAGRAM
+--------------------
+Dataset Files (.dat/.txt/.csv)
+    ↓
+[Data Loader] → Unified DataFrame
+    ↓
+[Feature Engineering] → Window-based Features
+    ↓
+[Label Extraction] → Classification Labels
+    ↓
+[Patient Split] → Train/Test Sets
+    ↓
+[Model Training] → Trained Models + Metrics
+    ↓
+[Inference] → Predictions
+    ↓
+[Visualization] → Interactive Dashboard
+
+DATA LOADING PIPELINE
+----------------------
+
+UNIFIED LOADER (src/load_data.py)
+---------------------------------
+The loader handles three file formats:
+
+1. .dat files:
+   - Reads header metadata until "HeaderEnd" marker
+   - Parses semicolon-separated values after header
+   - Extracts: Session Time, Volume, Balloon Valve Status, etc.
+   - Handles various header formats and metadata
+
+2. .txt files:
+   - Similar to .dat files
+   - Header section followed by semicolon-separated data
+   - Same column structure
+
+3. .csv files:
+   - Standard CSV parsing
+   - Column names in first row
+   - Direct pandas DataFrame creation
+
+Output:
+- Single DataFrame with standardized columns
+- Patient ID and File ID metadata
+- Consistent data structure across all formats
+
+FEATURE ENGINEERING
+-------------------
+
+WINDOW-BASED APPROACH (src/features.py)
+---------------------------------------
+The system uses fixed-length time windows (default: 2 seconds) to extract
+features. At 50 Hz sampling rate, this equals 100 samples per window.
+
+Window Creation:
+1. Sort data by Session Time
+2. Create non-overlapping windows of fixed duration
+3. Skip windows shorter than minimum threshold (default: 50 rows)
+
+Feature Extraction (per window):
+- Volume Statistics:
+  * Mean volume
+  * Standard deviation
+  * Minimum, maximum
+  * Range (max - min)
+  * Change (end - start)
+  * Rolling mean
+
+- Balloon Valve Features:
+  * Fraction inflated (status = 4)
+  * Fraction deflated (status = 1)
+
+- Patient Switch:
+  * Fraction of time switch is ON (status = 1)
+
+- Gating Mode:
+  * Fraction of time in "Automated" mode
+
+Total Features: 11 numeric features per window
+
+LABEL EXTRACTION
+----------------
+
+CLASSIFICATION TASKS (src/labels.py)
+-------------------------------------
+
+Task 1: Breath-hold vs Free-breathing
+- Source: Balloon Valve Status
+- Label 1 (Breath-hold): Any window with status = 4 (inflated)
+- Label 0 (Free-breathing): Otherwise (status = 1, 2, 3, or 5)
+- Window-level: If any sample in window has status 4 → label 1
+
+Task 2: Gating OK vs Not OK
+- Source: Gating Mode field
+- Label 1 (OK): Any window with "Automated" mode
+- Label 0 (Not OK): "Manual Overide" or other modes
+- Window-level: If any sample in window is "Automated" → label 1
+
+Label Assignment:
+- Labels are assigned per window (not per sample)
+- Majority or "any" rule used (depending on task)
+- Ensures consistent labeling for window-based features
+
+MODEL TRAINING
+--------------
+
+PATIENT-BASED SPLITS (src/train.py)
+------------------------------------
+Critical: Splits are done by patient_id, not by individual samples.
+This prevents data leakage (same patient in both train and test).
+
+Split Process:
+1. Group all windows by patient_id
+2. Randomly assign patients to train/val/test sets
+3. Default ratios: 70% train, 15% val, 15% test
+4. All windows from a patient go to the same set
+
+Why Patient-Based?
+- Prevents overfitting to specific patients
+- More realistic evaluation (generalization to new patients)
+- Standard practice for medical ML
+
+MODELS TRAINED
+--------------
+1. Random Forest:
+   - 100 trees (n_estimators=100)
+   - Handles non-linear relationships
+   - Provides feature importance
+
+2. Logistic Regression:
+   - Linear classifier
+   - Fast training and inference
+   - Interpretable coefficients
+
+3. Support Vector Machine (SVM):
+   - RBF kernel
+   - Good for complex decision boundaries
+   - Probability estimates enabled
+
+4. XGBoost (if installed):
+   - Gradient boosting
+   - Often best performance
+   - Feature importance available
+
+MODEL SELECTION
+---------------
+- All models trained on same train set
+- Evaluated on validation set (if provided) and test set
+- Best model selected by balanced accuracy
+- Balanced accuracy accounts for class imbalance
+
+PREPROCESSING
+-------------
+- Feature scaling: StandardScaler (mean=0, std=1)
+- Missing values: Filled with 0
+- Feature selection: All 11 features used
+
+OUTPUTS
+-------
+- models/best_model.pkl: Best model + scaler + task info
+- models/metrics.json: Best model summary
+- models/metrics_models.json: All models' metrics
+
+INFERENCE PIPELINE
+------------------
+
+PREDICTION PROCESS (frontend/utils/inference.py)
+-------------------------------------------------
+1. Load trained model:
+   - Load best_model.pkl
+   - Extract model, scaler, task name
+
+2. Process input file:
+   - Load file using unified loader
+   - Build windows with same parameters as training
+   - Extract features (11 features per window)
+
+3. Apply preprocessing:
+   - Use saved scaler to transform features
+   - Ensure same scaling as training data
+
+4. Generate predictions:
+   - Model.predict() → class predictions (0 or 1)
+   - Model.predict_proba() → probability scores
+   - Confidence = max(probabilities)
+
+5. Return results:
+   - DataFrame with: time windows, predictions, confidence, features
+   - Metadata: model name, num windows, num rows
+
+CACHING
+-------
+- Model loading: Cached in memory (avoid reloading)
+- Dataset summaries: Cached for 60 seconds
+- Patient data: Cached for 5 minutes
+
+FRONTEND ARCHITECTURE
+---------------------
+
+STREAMLIT MULTIPAGE APP
+-----------------------
+Native Streamlit multipage structure:
+- Main entrypoint: run_frontend.py (Home page)
+- Pages folder: pages/ (2_Upload_Predict.py, etc.)
+- Each page runs in isolation (fixes blank page issues)
+
+Page Structure:
+- Each page sets PROJECT_ROOT and adds to sys.path
+- Imports frontend.pages._* modules
+- Calls show() function to render content
+
+UTILITIES
+---------
+frontend/utils/:
+- inference.py: Prediction functions
+- visualization.py: Plotly charts
+- data_helpers.py: Dataset browsing helpers
+- llm_helper.py: LLM integration (optional)
+
+VISUALIZATION
+-------------
+Plotly-based interactive charts:
+- Breathing curves with volume over time
+- Prediction overlays (colored rectangles)
+- Confusion matrices
+- Feature importance bars
+
+Features:
+- Zoom, pan, hover tooltips
+- Responsive to container width
+- Sampled for performance (max 15,000 points)
+
+WINDOW-BASED FEATURE EXTRACTION DETAILS
+----------------------------------------
+
+WHY WINDOWS?
+------------
+- Raw time-series too granular for classification
+- Windows capture local patterns
+- Reduces noise and provides stable features
+- Matches clinical interpretation (breathing cycles)
+
+WINDOW SIZE SELECTION
+---------------------
+- Default: 2 seconds (100 samples at 50 Hz)
+- Trade-off:
+  * Smaller windows: More granular, but noisier
+  * Larger windows: Smoother, but less sensitive to changes
+- Adjustable in UI (1.0 to 5.0 seconds)
+
+FEATURE ENGINEERING RATIONALE
+------------------------------
+Volume Statistics:
+- Mean: Overall volume level
+- Std: Variability (breath-hold = low std)
+- Min/Max/Range: Amplitude of breathing
+- Change: Trend direction
+- Rolling mean: Smoothed trend
+
+Balloon Valve Fractions:
+- Fraction inflated: Direct indicator of breath-hold
+- Fraction deflated: Free-breathing indicator
+
+Patient Switch:
+- May indicate patient activity or control
+
+Gating Mode:
+- Fraction automated: System reliability indicator
+
+MODEL EVALUATION METRICS
+------------------------
+
+ACCURACY
+--------
+- Overall correctness: (TP + TN) / (TP + TN + FP + FN)
+- Can be misleading with class imbalance
+
+BALANCED ACCURACY
+-----------------
+- Average of sensitivity and specificity
+- Accounts for class imbalance
+- Used for model selection
+
+F1 SCORE
+--------
+- Harmonic mean of precision and recall
+- Good for imbalanced datasets
+- Range: 0 to 1
+
+CONFUSION MATRIX
+----------------
+- TP: True Positives (correctly predicted breath-hold)
+- TN: True Negatives (correctly predicted free-breathing)
+- FP: False Positives (predicted breath-hold but was free-breathing)
+- FN: False Negatives (predicted free-breathing but was breath-hold)
+
+DATA FLOW EXAMPLE
+-----------------
+
+Example: Predicting on a new file
+
+1. User uploads "patient_session.dat"
+2. Loader reads file → DataFrame with 10,000 rows
+3. Feature engineering:
+   - Creates 100 windows (2 sec each)
+   - Extracts 11 features per window
+   - Creates 100-row feature matrix
+4. Preprocessing:
+   - Applies StandardScaler (from training)
+   - Features normalized to mean=0, std=1
+5. Model inference:
+   - RandomForest predicts 100 class labels
+   - Predict_proba gives confidence scores
+6. Results:
+   - 100 predictions (0 or 1)
+   - 100 confidence scores (0.0 to 1.0)
+   - Time windows (0-2s, 2-4s, ..., 198-200s)
+7. Visualization:
+   - Plot shows volume curve
+   - Overlays colored rectangles for predictions
+   - User can hover for details
+
+PERFORMANCE CONSIDERATIONS
+--------------------------
+
+OPTIMIZATIONS
+-------------
+1. Caching:
+   - Models cached in memory
+   - Dataset summaries cached
+   - Reduces redundant computation
+
+2. Sampling:
+   - Large plots sampled to 15,000 points
+   - Prevents browser freezes
+   - Tables limited to 500 rows in UI
+
+3. Batch Processing:
+   - Sequential file processing
+   - Progress indicators
+   - Memory-efficient (process and release)
+
+LIMITATIONS
+-----------
+- Classical ML only (no deep learning)
+- Fixed window size (no adaptive windows)
+- Patient-based splits require multiple patients
+- Single-task models (train separately for each task)
+
+FUTURE ENHANCEMENTS
+-------------------
+- Deep learning models (LSTM, CNN)
+- Adaptive window sizing
+- Multi-task learning
+- Real-time streaming predictions
+- Advanced feature engineering
+
+For more details, see:
+- WHAT_IT_HAS.txt - Complete feature list
+- LIMITATIONS.txt - System constraints
+- API_REFERENCE.txt - Python API documentation
+
+================================================================================
+End of How It Works Guide
+================================================================================
