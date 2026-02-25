@@ -29,13 +29,16 @@ BALLOON_FREE_BREATHING_VALUES = ("1", 1)  # deflated = free breathing
 GATING_OK_MODES = ("Automated",)
 GATING_NOT_OK_MODES = ("Manual Overide", "Manual Override")
 
-MODELS_DIR.mkdir(parents=True, exist_ok=True)
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    pass  # Continue without creating dirs (e.g. permission denied); save/load will fail later with clear errors
 
 # LLM Integration (Ollama API)
 # Configure these when you have Ollama API available
 OLLAMA_API_URL = "http://localhost:11434/api/generate"  # Default Ollama local API
 # Recommended for this project: llama3.2:3b (fast, good) or mistral:7b (quality). See OLLAMA_MODELS.txt
 OLLAMA_MODEL = "llama3.2:3b"  # Change to e.g. "llama3.2:3b" or "mistral" after: ollama pull <name>
-OLLAMA_TIMEOUT = 180  # Seconds to wait for response (increase if using larger models)
+OLLAMA_TIMEOUT = 360  # Seconds to wait for response (increase if using larger models)
 # To use a different Ollama instance, change OLLAMA_API_URL

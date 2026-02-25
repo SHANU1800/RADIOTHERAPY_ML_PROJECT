@@ -1,0 +1,177 @@
+================================================================================
+DATASET GRAPH ANALYSIS 3
+Q&A + Practical Understanding Notes
+Date: 25-Feb-2026
+================================================================================
+
+Context:
+- Primary file discussed: dataset/Abdul Rehaman/ABDUL REHAMAN N_1.dat
+- Cross-check done across all .dat files in dataset folder
+
+
+Q1) WHY IS VOLUME NEGATIVE? DOES IT MEAN INHALING?
+==================================================
+Short answer:
+- Negative volume does NOT automatically mean inhaling.
+
+Correct interpretation:
+- Volume in these files is usually a sensor/reference-relative signal.
+- The sign (+/-) depends on baseline calibration and offset.
+- Inhaling/exhaling is better inferred from TREND (slope/change over time),
+  not from sign alone.
+
+Useful rule:
+- If volume is increasing over nearby samples, that suggests inhale direction.
+- If volume is decreasing, that suggests exhale direction.
+- Absolute sign alone can be misleading.
+
+Evidence from this sample file:
+- Volume has positive, zero, and negative values.
+- Median is 0, so baseline appears centered around zero.
+
+
+Q2) DO ALL .DAT FILES HAVE THE SAME STRUCTURE? IDENTICAL?
+==========================================================
+Short answer:
+- Mostly same STRUCTURE, but not 100% identical content.
+- You should still check all files (or run automated validation) before analysis.
+
+Dataset-wide audit (all .dat):
+- Total .dat files found: 148
+- Files with expected HeaderStart/HeaderEnd/[Curve Data]: 145
+- Standard row field-count [7 columns]: 145 files
+- Non-standard files: a few derived/special files
+
+Observed exceptions:
+- 2 files in Afsana Sadhick folder use simpler header line:
+  "Session Time;Volume"
+  (missing Balloon/Gating/Switch/Relay columns)
+- These are likely derived summary files, not full raw gating logs.
+
+Practical conclusion:
+- Most clinical .dat files follow the same full format.
+- Do NOT assume all are identical; validate file schema first.
+- For ML pipeline, include only files with required columns for your task.
+
+
+Q3) DO I NEED TO STUDY ALL .DAT FILES?
+======================================
+Short answer:
+- You don’t need manual line-by-line reading of all files.
+- But you MUST perform file-level validation + summary profiling across all.
+
+Recommended approach:
+1) Automated schema check (required columns present?)
+2) Data quality check (time-step consistency, missing/NaN, class coverage)
+3) Distribution check per file (balloon states, gating mode values)
+4) Exclude/flag outliers and derived summary files
+
+What to manually inspect:
+- A small representative sample from each patient
+- Any file that fails schema or quality checks
+- Files with unusual class balance or suspicious signals
+
+
+Q4) WHY DOES "CORRELATION WITH AVERAGE" MATTER IN THIS FILE?
+==============================================================
+First clarify the term:
+- "average" usually means mean/rolling mean/window mean feature.
+
+Why it matters:
+- Correlation with average helps verify whether smoothed trend captures
+  the same underlying breathing behavior as raw volume.
+- High correlation suggests stable signal relationship and consistent trend.
+- In feature engineering, strong correlation can also indicate redundancy.
+
+Evidence from this sample file:
+- corr(volume, rolling_mean_1s) = 0.878648 (strong positive)
+- At window level:
+  corr(vol_mean, vol_rolling_mean) = 1.0
+  corr(vol_mean, vol_max) = 0.925111
+  corr(vol_mean, vol_min) = 0.689441
+
+Interpretation:
+- Mean and rolling-mean are almost the same information here.
+- This is expected because vol_rolling_mean in current code is computed as
+  the window mean, making it perfectly correlated with vol_mean.
+- Correlation analysis helps decide which features are redundant.
+
+
+Q5) WHAT ARE NEGATIVE, NAN, AND NUMBERS IN GENERAL?
+===================================================
+Negative values:
+- Usually baseline-relative measurement below reference.
+- Not automatically invalid.
+
+NaN values:
+- NaN means "Not a Number" (missing/unparseable numeric value).
+- In this project, NaNs can appear if parsing fails or values are malformed.
+- Need handling (drop, impute, or set safe defaults depending on feature).
+
+Numbers / status codes:
+- Balloon Valve Status: categorical codes (1..5), not continuous quantity.
+- Patient Switch: binary code (0/1).
+- Session Time and Volume: continuous numeric signals.
+
+Dataset-wide NaN/sign check (all .dat parsed rows):
+- Total rows checked: 10,365,070
+- NaN in volume: 0 (0.0%)
+- Negative volume: 13.3766%
+- Zero volume: 20.2579%
+- Positive volume: 66.3655%
+
+Meaning:
+- NaN is not a major issue in this dataset for volume.
+- Negative values are common and expected in many files.
+
+
+Q6) WHAT IS RMSE? WHAT IS MAE?
+==============================
+These are regression error metrics (used when predicting numeric values).
+
+MAE (Mean Absolute Error):
+- Average absolute difference between prediction and true value.
+- Formula:
+  MAE = (1/n) * sum(|y_true - y_pred|)
+- Easy to interpret in original units.
+- Less sensitive to large outliers than RMSE.
+
+RMSE (Root Mean Squared Error):
+- Square root of average squared errors.
+- Formula:
+  RMSE = sqrt((1/n) * sum((y_true - y_pred)^2))
+- Penalizes large errors more strongly than MAE.
+- Useful when big mistakes are especially costly.
+
+How to explain quickly:
+- MAE = average mistake size.
+- RMSE = outlier-sensitive mistake size.
+- Usually RMSE >= MAE.
+
+In this project context:
+- Current core tasks are classification (0/1 labels), so metrics like
+  Accuracy/F1/Balanced Accuracy/Confusion Matrix are primary.
+- RMSE/MAE become relevant if you add regression (e.g., volume forecasting).
+
+
+Q7) KEY TAKEAWAYS FOR PRESENTATION
+==================================
+1) Negative volume is reference-based, not direct inhale label.
+2) Most .dat files share common 7-column structure, but a few exceptions exist.
+3) You should validate all files automatically; no need to read all manually.
+4) Correlation with average helps understand trend quality and feature redundancy.
+5) NaN is a missing-value concept; in this dataset, volume NaN is negligible.
+6) RMSE/MAE are regression metrics; current project is mainly classification.
+
+
+Q8) SAFE TECHNICAL STATEMENT (READY TO SPEAK)
+=============================================
+"In our dataset, most .dat files follow a consistent 7-column clinical format,
+but we still run schema validation because not all files are identical. Negative
+volume values are baseline-relative signal values, not direct inhale labels.
+For classification we focus on balanced accuracy/F1/confusion matrix, and RMSE/
+MAE are used only when modeling continuous targets like future volume."
+
+================================================================================
+END
+================================================================================

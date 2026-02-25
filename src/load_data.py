@@ -89,22 +89,43 @@ def load_patient_file(
     if file_id is None:
         file_id = path.stem
 
-    if suffix == ".csv":
-        df = pd.read_csv(path, encoding="utf-8", on_bad_lines="skip")
-        # Normalize column names to match CURVE_COLUMNS if possible
-        cols = list(df.columns)
-        if "Session Time" not in cols and "Volume (liters)" not in cols:
-            # Try first two columns as time and volume
-            if len(cols) >= 2:
-                df = df.rename(columns={cols[0]: "Session Time", cols[1]: "Volume (liters)"})
-    elif suffix in (".dat", ".txt"):
-        with path.open("r", encoding="utf-8", errors="ignore") as f:
-            lines = f.readlines()
-        _, start = _parse_header_semicolon(lines)
-        df = _parse_semicolon_data(lines, start)
-    else:
-        raise ValueError(f"Unsupported file extension: {suffix}. Use .dat, .txt, or .csv.")
+    try:
+        if suffix == ".csv":
+            try:
+                df = pd.read_csv(path, encoding="utf-8", on_bad_lines="skip")
+            except (UnicodeDecodeError, pd.errors.ParserError):
+                df = pd.read_csv(path, encoding="latin-1", on_bad_lines="skip")
+            # Normalize column names to match CURVE_COLUMNS if possible
+            cols = list(df.columns)
+            if "Session Time" not in cols and "Volume (liters)" not in cols:
+                # Try first two columns as time and volume
+                if len(cols) >= 2:
+                    df = df.rename(columns={cols[0]: "Session Time", cols[1]: "Volume (liters)"})
+        elif suffix in (".dat", ".txt"):
+            with path.open("r", encoding="utf-8", errors="ignore") as f:
+                lines = f.readlines()
+            _, start = _parse_header_semicolon(lines)
+            df = _parse_semicolon_data(lines, start)
+        else:
+            raise ValueError(f"Unsupported file extension: {suffix}. Use .dat, .txt, or .csv.")
+    except (ValueError, FileNotFoundError, ImportError):
+        raise
+    except Exception as e:
+        raise ValueError(f"Could not parse file {path.name}: {e}") from e
 
+    # Ensure required columns exist for downstream use
+    required = ["Session Time", "Volume (liters)"]
+    for col in required:
+        if col not in df.columns:
+            raise ValueError(f"File missing required column: {col}. Found: {list(df.columns)}")
+    df = df.dropna(subset=["Session Time", "Volume (liters)"])
+    if len(df) == 0:
+        raise ValueError("File has no valid rows after parsing (check Session Time and Volume columns).")
+
+    # Pad missing optional columns so features don't fail
+    for col in CURVE_COLUMNS:
+        if col not in df.columns:
+            df[col] = "" if col not in ("Session Time", "Volume (liters)") else 0
     df["patient_id"] = patient_id
     df["file_id"] = file_id
     return df
@@ -127,8 +148,10 @@ def load_all_patients(
     if pd is None:
         raise ImportError("pandas is required for load_data")
     dataset_dir = Path(dataset_dir)
-    if not dataset_dir.is_dir():
+    if not dataset_dir.exists():
         raise FileNotFoundError(f"Dataset directory not found: {dataset_dir}")
+    if not dataset_dir.is_dir():
+        raise ValueError(f"Path is not a directory: {dataset_dir}")
 
     frames: List[pd.DataFrame] = []
     session_metadata: Dict[str, List[Dict[str, str]]] = {}
@@ -138,7 +161,10 @@ def load_all_patients(
         if include_session_ini:
             ini_path = patient_dir / "session.ini"
             if ini_path.exists():
-                session_metadata[patient_id] = _read_session_ini(ini_path)
+                try:
+                    session_metadata[patient_id] = _read_session_ini(ini_path)
+                except Exception:
+                    session_metadata[patient_id] = []
 
         for file_path in sorted(patient_dir.rglob("*")):
             if not file_path.is_file():
@@ -180,6 +206,15 @@ def _read_session_ini(ini_path: Path) -> List[Dict[str, str]]:
         if current:
             blocks.append(current)
     return blocks
+
+
+def get_patient_session_ini(dataset_dir: Union[str, Path], patient_id: str) -> List[Dict[str, str]]:
+    """Read session.ini for a patient. Returns list of session blocks (dicts) or empty list if not found."""
+    dataset_dir = Path(dataset_dir)
+    ini_path = dataset_dir / patient_id / "session.ini"
+    if not ini_path.exists():
+        return []
+    return _read_session_ini(ini_path)
 
 
 def get_patient_file_list(dataset_dir: Union[str, Path]) -> List[Tuple[str, Path]]:

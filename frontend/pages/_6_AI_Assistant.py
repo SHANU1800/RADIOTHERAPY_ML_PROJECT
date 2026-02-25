@@ -22,8 +22,8 @@ import config as cfg
 
 
 def show():
-    st.markdown(f'<h1 style="display: flex; align-items: center; gap: 10px;">{icon_html("robot", 32)} AI Assistant</h1>', unsafe_allow_html=True)
-    st.markdown("Ask questions, get explanations, and generate reports using AI.")
+    st.markdown(f'<p class="page-header">{icon_html("robot", 28)} AI Assistant</p>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">Ask questions, get explanations, and generate reports using AI.</p>', unsafe_allow_html=True)
     
     # Check LLM status
     llm_status = get_llm_status()
@@ -72,7 +72,7 @@ def show():
                 "total_files": len(file_summary),
                 "total_duration_hours": patient_summary["duration_s"].sum() / 3600 if "duration_s" in patient_summary.columns else 0
             }
-        except:
+        except Exception:
             dataset_info = {}
         
         # Model info
@@ -173,7 +173,7 @@ def show():
                 "patient_summary": patient_summary.to_dict("records")[:5] if len(patient_summary) > 0 else [],
                 "file_summary": file_summary.to_dict("records")[:10] if len(file_summary) > 0 else []
             }
-        except:
+        except Exception:
             analysis_data = {}
         
         if report_type == "patient_summary":

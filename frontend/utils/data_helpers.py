@@ -18,6 +18,28 @@ from src.load_data import load_all_patients, get_patient_file_list
 import config as cfg
 
 
+def prediction_to_label(prediction: int, task: str) -> str:
+    """Map numeric prediction (0/1) and task to human-readable label."""
+    if task == "gating_ok":
+        return "Gating OK" if prediction == 1 else "Gating Not OK"
+    return "Breath-hold" if prediction == 1 else "Free-breathing"
+
+
+def confidence_bucket(conf: float) -> str:
+    """Bucket confidence for research: High (>=0.9), Medium (0.7-0.9), Low (<0.7)."""
+    try:
+        c = float(conf)
+    except (TypeError, ValueError):
+        return "Low (<0.7)"
+    if pd is not None and hasattr(pd, "isna") and pd.isna(c):
+        return "Low (<0.7)"
+    if c >= 0.9:
+        return "High (>=0.9)"
+    if c >= 0.7:
+        return "Medium (0.7-0.9)"
+    return "Low (<0.7)"
+
+
 def get_patient_list() -> List[str]:
     """Get list of all patient IDs from dataset directory."""
     dataset_dir = cfg.DATASET_DIR
@@ -54,12 +76,13 @@ def load_summary_stats() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     file_summary = pd.DataFrame()
     patient_summary = pd.DataFrame()
     other_files = pd.DataFrame()
-    
-    if (analysis_out / "file_summary.csv").exists():
-        file_summary = pd.read_csv(analysis_out / "file_summary.csv")
-    if (analysis_out / "patient_summary.csv").exists():
-        patient_summary = pd.read_csv(analysis_out / "patient_summary.csv")
-    if (analysis_out / "other_files.csv").exists():
-        other_files = pd.read_csv(analysis_out / "other_files.csv")
-    
+    try:
+        if (analysis_out / "file_summary.csv").exists():
+            file_summary = pd.read_csv(analysis_out / "file_summary.csv")
+        if (analysis_out / "patient_summary.csv").exists():
+            patient_summary = pd.read_csv(analysis_out / "patient_summary.csv")
+        if (analysis_out / "other_files.csv").exists():
+            other_files = pd.read_csv(analysis_out / "other_files.csv")
+    except Exception as e:
+        raise RuntimeError(f"Could not read summary CSVs from {analysis_out}: {e}") from e
     return file_summary, patient_summary, other_files

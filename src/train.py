@@ -10,7 +10,7 @@ import argparse
 import json
 import pickle
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import numpy as np
@@ -168,59 +168,93 @@ def main() -> None:
     parser.add_argument("--out-dir", type=Path, default=PROJECT_ROOT / "models")
     args = parser.parse_args()
 
-    out_dir = args.out_dir
-    out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        out_dir = args.out_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
 
-    print("Loading data...")
-    df, _ = load_all_patients(args.dataset, include_session_ini=False)
-    if len(df) == 0:
-        print("No data loaded. Check dataset path.")
-        return
-    print(f"Loaded {len(df)} rows, {df['patient_id'].nunique()} patients.")
+        print("Loading data...")
+        df, _ = load_all_patients(args.dataset, include_session_ini=False)
+        if len(df) == 0:
+            print("ERROR: No data loaded. Check dataset path and that it contains .dat/.txt/.csv files.")
+            sys.exit(1)
+        print(f"Loaded {len(df)} rows, {df['patient_id'].nunique()} patients.")
 
-    print("Building windows and features...")
-    windows = build_windows(
-        df,
-        window_sec=args.window_sec,
-        sample_rate_hz=50,
-        min_rows=50,
-    )
-    if len(windows) == 0:
-        print("No windows produced. Check data and min_rows.")
-        return
-    print(f"Built {len(windows)} windows.")
+        print("Building windows and features...")
+        windows = build_windows(
+            df,
+            window_sec=args.window_sec,
+            sample_rate_hz=50,
+            min_rows=50,
+        )
+        if len(windows) == 0:
+            print("ERROR: No windows produced. Check data length and min_rows (need enough rows per window).")
+            sys.exit(1)
+        print(f"Built {len(windows)} windows.")
 
-    X, y, patient_ids = get_X_y(windows, task=args.task)
-    X_train, X_val, X_test, y_train, y_val, y_test = patient_split(
-        X, y, patient_ids,
-        train_ratio=args.train_ratio,
-        val_ratio=0.15,
-        test_ratio=0.15,
-        random_state=args.seed,
-    )
-    print(f"Train {len(X_train)}, Val {len(X_val)}, Test {len(X_test)} samples.")
+        X, y, patient_ids = get_X_y(windows, task=args.task)
+        X_train, X_val, X_test, y_train, y_val, y_test = patient_split(
+            X, y, patient_ids,
+            train_ratio=args.train_ratio,
+            val_ratio=0.15,
+            test_ratio=0.15,
+            random_state=args.seed,
+        )
+        print(f"Train {len(X_train)}, Val {len(X_val)}, Test {len(X_test)} samples.")
 
-    metrics, best_model, scaler = train_and_evaluate(
-        X_train, y_train, X_test, y_test,
-        X_val=X_val if len(X_val) > 0 else None,
-        y_val=y_val if len(y_val) > 0 else None,
-        scale=True,
-        random_state=args.seed,
-    )
+        if len(X_train) == 0 or len(X_test) == 0:
+            print("ERROR: Train or test set is empty. Need at least 2 patients or more data.")
+            sys.exit(1)
 
-    print("\nResults:")
-    for name, m in metrics["models"].items():
-        print(f"  {name}: acc={m['accuracy']:.4f}, bal_acc={m['balanced_accuracy']:.4f}, f1={m['f1']:.4f}")
-    print(f"Best: {metrics['best_model']} (balanced_accuracy={metrics['best_balanced_accuracy']:.4f})")
+        metrics, best_model, scaler = train_and_evaluate(
+            X_train, y_train, X_test, y_test,
+            X_val=X_val if len(X_val) > 0 else None,
+            y_val=y_val if len(y_val) > 0 else None,
+            scale=True,
+            random_state=args.seed,
+        )
 
-    # Save
-    with (out_dir / "metrics.json").open("w") as f:
-        json.dump({"best_model": metrics["best_model"], "best_balanced_accuracy": metrics["best_balanced_accuracy"]}, f, indent=2)
-    with (out_dir / "metrics_models.json").open("w") as f:
-        json.dump(metrics["models"], f, indent=2)
-    with (out_dir / "best_model.pkl").open("wb") as f:
-        pickle.dump({"model": best_model, "scaler": scaler, "task": args.task}, f)
-    print(f"Saved metrics and model to {out_dir}")
+        print("\nResults:")
+        for name, m in metrics["models"].items():
+            print(f"  {name}: acc={m['accuracy']:.4f}, bal_acc={m['balanced_accuracy']:.4f}, f1={m['f1']:.4f}")
+        print(f"Best: {metrics['best_model']} (balanced_accuracy={metrics['best_balanced_accuracy']:.4f})")
+
+        # Save test set predictions for ROC/PR curves in frontend
+        X_te = scaler.transform(X_test) if scaler is not None else X_test.values
+        y_pred = best_model.predict(X_te)
+        proba_class1 = None
+        if hasattr(best_model, "predict_proba"):
+            proba = best_model.predict_proba(X_te)
+            proba_class1 = proba[:, 1].tolist()
+        test_predictions = {
+            "task": args.task,
+            "best_model": metrics["best_model"],
+            "n_test": int(len(y_test)),
+            "y_true": y_test.astype(int).tolist(),
+            "y_pred": y_pred.astype(int).tolist(),
+            "proba_class1": proba_class1,
+        }
+        with (out_dir / "test_predictions.json").open("w") as f:
+            json.dump(test_predictions, f, indent=2)
+
+        # Save
+        with (out_dir / "metrics.json").open("w") as f:
+            json.dump({"best_model": metrics["best_model"], "best_balanced_accuracy": metrics["best_balanced_accuracy"]}, f, indent=2)
+        with (out_dir / "metrics_models.json").open("w") as f:
+            json.dump(metrics["models"], f, indent=2)
+        with (out_dir / "best_model.pkl").open("wb") as f:
+            pickle.dump({"model": best_model, "scaler": scaler, "task": args.task}, f)
+        print(f"Saved metrics and model to {out_dir}")
+    except FileNotFoundError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
+    except ValueError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

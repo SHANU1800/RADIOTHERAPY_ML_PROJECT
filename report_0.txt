@@ -1,0 +1,189 @@
+================================================================================
+                    KMC PROJECT — PROJECT REPORT
+                    Breathing Patterns ML Dashboard
+================================================================================
+
+1. PROJECT OVERVIEW
+-------------------
+This project is a research-grade dashboard for classifying breathing patterns
+in radiation therapy gating data. It supports two main classification tasks:
+  • Breath-hold vs Free-breathing (from Balloon Valve Status)
+  • Gating OK vs Not OK (from Gating Mode: Automated vs Manual)
+
+The system loads breathing-curve files, extracts windowed features, runs a
+trained ML model for per-window predictions with confidence scores, and
+presents results with charts, clinical zone analysis, and exportable reports.
+
+
+2. MAIN FEATURES
+----------------
+
+2.1 Upload & Predict (Core Feature)
+  • Upload a single .dat, .txt, or .csv breathing curve file
+  • Choose task (breath_hold or gating_ok) and window size (1–5 s)
+  • Run prediction and get:
+    - Hero result: predominant class, median confidence, stability score
+    - Key metrics: duration, window count, class counts, low-confidence count, transitions
+    - Tabbed analysis: Charts | Breathing Curve | Features | Clinical Zones | Data Table | Glossary
+  • Charts: class donut, confidence over time, confidence buckets/histogram,
+    state transitions, radar feature profile, prediction timeline
+  • Annotated breathing curve (volume vs time) with prediction background coloring
+  • Per-window feature statistics and class-separated feature comparison
+  • Clinical zone analysis: longest breath-hold stretch, longest free-breathing stretch,
+    lowest-confidence zone
+  • Window-level predictions table (first 500 rows; full CSV download)
+  • Export: full predictions CSV, summary report TXT, curve PNG/CSV
+  • Glossary of terms (Window, Prediction, Confidence, Stability score, etc.)
+  • Optional AI explanation of predictions (via Ollama)
+
+2.2 Home
+  • Hero banner and short project description
+  • System status: Model ready / Dataset found / AI (LLM) connected
+  • Dataset-at-a-glance metrics (patients, files, total duration, model trained)
+  • Feature cards for each main page (Upload & Predict, Dataset Explorer,
+    Model Performance, Batch Analysis, AI Assistant, Export & Report)
+  • Quick start: train model, upload file, review analysis, download
+
+2.3 Dataset Explorer
+  • Dataset-wide stats (from analysis output) in expander
+  • Patient and file selectors; load and cache patient data
+  • Statistics: duration, rows, volume min/max/mean/std
+  • Balloon Valve Status and Gating Mode bar charts (with PNG download)
+  • Volume distribution histogram
+  • Breathing curve visualization with options: show balloon, gating, rolling mean
+  • Session metadata (session.ini) expander
+  • Download file stats CSV, curve data CSV, chart PNG
+  • Window breakdown (ground truth): compute windows, view breath-hold vs
+    free-breathing counts and curve with ground-truth labels
+  • Generate Patient Report with AI
+
+2.4 Model Performance
+  • Best model summary (name, balanced accuracy) in styled panel
+  • Confusion matrix (best model) with PNG/CSV download
+  • ROC and Precision-Recall curves (when test_predictions.json exists)
+  • Feature importance chart and CSV (for tree/linear models)
+  • Ask AI about results (questions about metrics, features, interpretation)
+  • Expandable section: compare all trained models (metrics table, comparison
+    chart, confusion matrices per model)
+
+2.5 Batch Analysis
+  • Upload multiple .dat/.txt/.csv files
+  • Process all with progress bar; per-file errors reported in summary table
+  • Summary table: file, rows, windows, class counts, percentages, median/avg
+    confidence, low-conf count, model
+  • Combined predictions DataFrame and download combined CSV
+  • File comparison: select files, side-by-side breathing curves with
+    predictions, per-file PNG/CSV download
+
+2.6 AI Assistant
+  • LLM status: available or not (Ollama API); setup instructions if offline
+  • Tabs: Ask Questions | Explain Predictions | Generate Reports
+  • Ask questions about dataset, models, predictions, usage (with context)
+  • Explain predictions: upload CSV or enter summary manually; get AI explanation
+  • Generate reports: patient summary, prediction analysis, dataset overview
+  • Help expander with usage notes
+
+
+3. DATA & ML PIPELINE
+---------------------
+
+3.1 Data Loading (src/load_data.py)
+  • Supports .dat, .txt (semicolon header + data), .csv (UTF-8 / Latin-1 fallback)
+  • Required columns: Session Time, Volume (liters); optional: Balloon Valve Status,
+    Patient Switch, Gating Mode, etc.
+  • load_patient_file(): single file → DataFrame with patient_id, file_id
+  • load_all_patients(): dataset directory → concatenated DataFrame; optional
+    session.ini parsing per patient
+  • Robust parsing: missing optional columns padded; validation and clear errors
+
+3.2 Labels (src/labels.py)
+  • Breath-hold: Balloon Valve Status 4 = inflated → 1; else 0
+  • Gating OK: Gating Mode "Automated" → 1; else 0
+  • Per-window labels: window_label_breath_hold, window_label_gating_ok
+
+3.3 Feature Engineering (src/features.py)
+  • Fixed-length windows (configurable window_sec, sample_rate_hz, min_rows)
+  • Per-window features: vol_mean, vol_std, vol_min, vol_max, vol_range, vol_change,
+    vol_rolling_mean; frac_balloon_inflated, frac_balloon_deflated,
+    frac_patient_switch_on, frac_gating_automated
+  • get_X_y(): extract feature matrix and labels for a given task
+
+3.4 Training (src/train.py)
+  • Patient-based train/val/test split (no patient leakage)
+  • Models: RandomForest, LogisticRegression, SVM; XGBoost if installed
+  • Best model by balanced accuracy; StandardScaler optional
+  • Saves: best_model.pkl (model, scaler, task), metrics.json, metrics_models.json,
+    test_predictions.json (for ROC/PR in frontend)
+  • Usage: python -m src.train [--task breath_hold|gating_ok] [--dataset path]
+
+3.5 Inference (frontend/utils/inference.py)
+  • load_model(): cached load of best_model.pkl for given task
+  • predict_breathing_pattern(): load file → build windows → get features →
+    scale → predict → add prediction, confidence, prob_class_0/1 → return
+    windows DataFrame + metadata
+
+
+4. FRONTEND & UX
+----------------
+  • Streamlit app (run_frontend.py); layout: wide; sidebar: dark gradient
+  • Global theme: CSS variables (accent, success, warning, danger, surface, text);
+    cards, badges, result panels, section dividers
+  • Sidebar: brand, navigation (Upload & Predict, Home, Dataset Explorer,
+    Model Performance, Batch Analysis, AI Assistant), status badges (Model /
+    Dataset), footer (KMC Project v1.0)
+  • Page headers and subtitles consistent across pages
+  • Icons: SVG set (lungs, upload, search, chart, package, robot, check, alert,
+    home, activity, layers, download, target, zap, clipboard, shield, etc.)
+  • Error handling: centralized user_facing_message(); try/except and cleanup
+    (e.g. temp files) in upload, batch, and data loading
+
+
+5. ERROR HANDLING & ROBUSTNESS
+------------------------------
+  • frontend/utils/error_handling.py: user_facing_message(exc), safe_run()
+  • File not found, permission, value, import, key, type, encoding errors
+    mapped to short user messages
+  • Loaders: required columns checked; optional columns padded; invalid JSON
+    or pickle handled in model/metrics load
+  • Temp file cleanup in finally blocks (Upload & Predict, Batch comparison)
+  • All page routes wrapped in try/except with user_facing_message + st.exception
+
+
+6. TECH STACK
+-------------
+  • Python 3
+  • Streamlit (frontend)
+  • Pandas, NumPy (data)
+  • Scikit-learn (models, metrics, preprocessing)
+  • XGBoost (optional)
+  • Plotly (charts)
+  • Ollama API / requests (optional LLM: explanations, Q&A, reports)
+  • Config: config.py (paths, WINDOW_SEC, SAMPLE_RATE_HZ, OLLAMA_*)
+
+
+7. HOW TO RUN
+-------------
+  • Train a model (from project root):
+      python -m src.train --dataset dataset/
+  • Run the dashboard:
+      streamlit run run_frontend.py
+  • Dataset: place patient folders under dataset/; each folder can contain
+    .dat, .txt, .csv breathing curve files and optional session.ini.
+
+
+8. DELIVERABLES / EXPORTS
+--------------------------
+  • Predictions CSV (per file or batch)
+  • Summary report TXT (file, task, model, duration, counts, confidence, stability, transitions)
+  • Breathing curve PNG
+  • Curve data CSV (time, volume)
+  • Confusion matrix PNG/CSV
+  • ROC / PR curve PNG
+  • Feature importance PNG/CSV
+  • Model metrics table CSV
+  • AI-generated reports (patient summary, prediction analysis, dataset overview)
+
+
+================================================================================
+                              END OF REPORT
+================================================================================

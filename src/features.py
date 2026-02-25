@@ -32,6 +32,20 @@ def build_windows(
     """
     if pd is None or np is None:
         raise ImportError("pandas and numpy required")
+    required = ["Session Time", "Volume (liters)", "patient_id", "file_id"]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise ValueError(f"build_windows requires columns: {missing}. Found: {list(df.columns)}")
+    if len(df) == 0:
+        return pd.DataFrame()
+
+    optional_cols = ["Balloon Valve Status", "Patient Switch", "Gating Mode"]
+    missing_opt = [col for col in optional_cols if col not in df.columns]
+    if missing_opt:
+        df = df.copy()
+        for col in missing_opt:
+            df[col] = ""
+
     window_size = int(round(window_sec * sample_rate_hz))
     if window_size < 10:
         window_size = 10
@@ -124,6 +138,8 @@ def get_X_y(
     """
     if pd is None:
         raise ImportError("pandas required")
+    if task not in ("breath_hold", "gating_ok"):
+        raise ValueError(f"task must be 'breath_hold' or 'gating_ok', got: {task}")
     feature_cols = [
         "vol_mean", "vol_std", "vol_min", "vol_max", "vol_range", "vol_change", "vol_rolling_mean",
         "frac_balloon_inflated", "frac_balloon_deflated", "frac_patient_switch_on", "frac_gating_automated",
@@ -132,6 +148,15 @@ def get_X_y(
         label_col = "label_breath_hold"
     else:
         label_col = "label_gating_ok"
+    missing_feat = [c for c in feature_cols if c not in windows_df.columns]
+    if missing_feat:
+        raise ValueError(f"get_X_y missing feature columns: {missing_feat}")
+    if label_col not in windows_df.columns:
+        raise ValueError(f"get_X_y missing label column: {label_col}")
+    if "patient_id" not in windows_df.columns:
+        raise ValueError("get_X_y requires patient_id column")
+    if len(windows_df) == 0:
+        raise ValueError("windows_df is empty")
     X = windows_df[feature_cols].copy()
     X = X.fillna(0)
     y = windows_df[label_col]

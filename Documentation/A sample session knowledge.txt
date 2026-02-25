@@ -1,0 +1,416 @@
+================================================================================
+A SAMPLE SESSION KNOWLEDGE (FULL DETAILED REFERENCE)
+Source file analyzed: dataset/Abdul Rehaman/ABDUL REHAMAN N_1.dat
+================================================================================
+
+PURPOSE OF THIS DOCUMENT
+------------------------
+This document stores EVERYTHING understood from the sample .dat session file:
+1) exact file structure,
+2) meaning of each field,
+3) computed statistics over the full recording,
+4) temporal behavior and state transitions,
+5) mapping to ML labels/features used in this project,
+6) what this file is useful for,
+7) caveats and correct interpretation boundaries.
+
+
+SECTION 1: WHAT THIS FILE IS
+----------------------------
+This is a respiratory-gating curve-data export for one patient session in a
+radiation-therapy workflow. It is a high-frequency time-series log with device
+state fields and breathing volume signal.
+
+High-level role in project:
+- It is one training/inference input source.
+- It provides row-level signal + state entries that are later converted into
+  fixed windows for machine learning.
+
+
+SECTION 2: FILE FORMAT AND STRUCTURE
+------------------------------------
+The file format is plain text with semicolon-separated data rows after header.
+
+Structure blocks:
+1) FILE STAMP
+  CURVE_DATA_FILE_STAMP
+
+2) HEADER REGION
+  Starts at: HeaderStart
+  Ends at:   HeaderEnd
+  Contains metadata and legend.
+
+3) KEY/LEGEND
+  Human-readable mapping of status codes.
+
+4) CURVE DATA TABLE
+  Starts immediately after HeaderEnd
+  Data row pattern:
+  Session Time;Volume (liters);Balloon Valve Status;Patient Switch;
+  Gating Mode;Gating Status;Relay State
+
+
+SECTION 3: HEADER METADATA (EXACT)
+----------------------------------
+Extracted metadata:
+- Threshold: 0.80
+- Count Frequency: 50
+- Patient Last Name: ABDUL REHAMAN N
+- Medical ID: 7132024
+- Date: 09-12-2024
+- Time: 16:11:19
+- Session Number: 1
+- Breath Hold Duration: 20
+- Trigger on Inhale: True
+
+Interpretation:
+- Sampling rate target is 50 Hz (expected dt = 0.02 sec).
+- Breath-hold protocol appears inhale-triggered.
+- Session is explicitly identified as session #1.
+
+
+SECTION 4: LEGEND / STATUS DEFINITIONS
+--------------------------------------
+Balloon Valve Status (from file key):
+- 1 = deflated
+- 2 = ready to inflate at threshold (inhale)
+- 3 = ready to inflate at threshold (exhale)
+- 4 = inflated
+- 5 = fault
+
+Patient Switch:
+- 0 = Disabled
+- 1 = Enabled
+
+Important practical meaning:
+- In this project, status=4 is treated as breath-hold signal (label-positive
+  condition in window logic).
+- Status=1 indicates deflated/free-breathing-like condition.
+
+
+SECTION 5: COLUMN-BY-COLUMN EXPLANATION
+---------------------------------------
+Data columns after parsing:
+1) Session Time
+  - Time from session start in seconds.
+  - Used for ordering and window slicing.
+
+2) Volume (liters)
+  - Breathing signal value (sensor reference-based).
+  - Can be positive, zero, or negative depending on baseline/reference.
+
+3) Balloon Valve Status
+  - Encoded device state (1..5).
+  - Core signal for breath-hold label generation.
+
+4) Patient Switch
+  - Binary status channel (0/1).
+  - Used as a feature (fraction ON in each window).
+
+5) Gating Mode
+  - Text mode values (e.g., Manual Overide, Automated, or placeholder '-').
+  - Core signal for gating label generation.
+
+6) Gating Status
+  - Additional status channel; in this file mostly placeholder values.
+
+7) Relay State
+  - Device relay channel; in this file mostly placeholder values.
+
+
+SECTION 6: DATA INTEGRITY CHECK (FULL RECORDING)
+------------------------------------------------
+Computed from full parsed session (173,032 rows):
+
+Timing integrity:
+- rows: 173,032
+- time_min: 0.02 sec
+- time_max: 3460.64 sec
+- effective duration: 3460.62 sec (~57.677 min)
+- dt_min: 0.02 sec
+- dt_max: 0.02 sec
+- dt_mean: 0.02 sec
+- dt_std: 0.0
+- irregular_dt_count (non-0.02): 0
+
+Conclusion:
+- Sampling is perfectly regular at 50 Hz in parsed rows.
+
+
+SECTION 7: DISTRIBUTIONS AND DESCRIPTIVE STATISTICS
+----------------------------------------------------
+7.1 Volume (liters)
+-------------------
+- min: -0.324
+- max: 1.336
+- mean: 0.048151
+- std: 0.146625
+- IQR: 0.072
+
+Volume quantiles:
+- 0%   : -0.324
+- 1%   : -0.248
+- 5%   : -0.188
+- 25%  :  0.000
+- 50%  :  0.000
+- 75%  :  0.072
+- 95%  :  0.352
+- 99%  :  0.540
+- 100% :  1.336
+
+Sign distribution:
+- zero values    : 46.62%
+- negative values: 13.19%
+- positive values: 40.18%
+
+Interpretation:
+- Median at 0 indicates strong center around baseline/reference zero.
+- Nontrivial positive and negative tails indicate dynamic signal swings.
+
+
+7.2 Balloon Valve Status distribution
+-------------------------------------
+- status 1: 144,637 (83.59%)
+- status 2: 405 (0.23%)
+- status 3: 15,563 (8.99%)
+- status 4: 12,426 (7.18%)
+- status 5: 1 (~0.00%)
+
+Interpretation:
+- Session is mostly deflated state.
+- Inflated state is present and substantial enough for hold-event analysis.
+- Fault condition is practically absent (1 sample only).
+
+
+7.3 Gating Mode distribution
+----------------------------
+- '-' placeholder     : 165,945
+- 'Manual Overide'    : 7,087
+- 'Automated'         : not observed in meaningful values
+
+Interpretation:
+- Gating mode field in this session is mostly placeholder or manual override.
+- This file alone provides weak positive examples for gating_ok label.
+
+
+7.4 Patient Switch distribution
+-------------------------------
+- 0: 89,055
+- 1: 83,977
+
+Interpretation:
+- Switch toggles over session; not fixed to one state.
+
+
+SECTION 8: TRANSITION ANALYSIS (BALLOON STATE DYNAMICS)
+--------------------------------------------------------
+Observed transition matrix (previous -> current):
+
+prev\curr     1      2      3      4      5
+1         144598      1     36      0      1
+2              1    404      0      0      0
+3             17      0  15527     19      0
+4             19      0      0  12407      0
+5              1      0      0      0      0
+
+Interpretation:
+- Strong self-persistence in states 1, 3, and 4 (long blocks).
+- Most meaningful cross-transitions involve:
+  * 3 -> 4 (enter inflated),
+  * 4 -> 1 (return to deflated),
+  * 3 -> 1 and 1 -> 3 (phase readiness/transition behavior).
+- Status 2 appears as one long block with almost no transitions.
+
+
+SECTION 9: RUN-LENGTH ANALYSIS (HOW LONG STATES LAST)
+------------------------------------------------------
+Run statistics by status (converted to seconds using 0.02 sec/sample):
+
+Status 1 (deflated):
+- run_count: 39
+- mean duration: 74.173 sec
+- median duration: 18.24 sec
+- max duration: 871.5 sec
+
+Status 2 (ready inhale threshold):
+- run_count: 1
+- mean/median/max: 8.1 sec
+
+Status 3 (ready exhale threshold):
+- run_count: 36
+- mean duration: 8.646 sec
+- median duration: 3.81 sec
+- max duration: 69.1 sec
+
+Status 4 (inflated):
+- run_count: 19
+- mean duration: 13.08 sec
+- median duration: 15.0 sec
+- max duration: 15.0 sec
+
+Status 5 (fault):
+- run_count: 1
+- duration: 0.02 sec
+
+Interpretation:
+- Inflated events are repeated and tightly duration-bounded (~15 sec cap).
+- Deflated periods include long recovery/idle stretches.
+
+
+SECTION 10: BREATH-HOLD EPISODE INSIGHT
+---------------------------------------
+Using project convention (Balloon Status == 4 implies hold-like condition):
+- hold episodes detected: 19
+- hold samples total: 12,426
+- mean hold duration: 13.08 sec
+- median hold duration: 15.0 sec
+- max hold duration: 15.0 sec
+
+Interpretive note:
+- Header says Breath Hold Duration = 20, but observed inflated runs top out at
+  ~15 sec in this file. This can happen due to workflow behavior, protocol,
+  patient behavior, or device-mode constraints.
+
+
+SECTION 11: HOW THIS FILE MAPS TO PROJECT ML LABELS
+----------------------------------------------------
+Project labeling logic (from src/labels.py and src/features.py):
+
+Breath-hold label at window level:
+- label_breath_hold = 1 if ANY sample in the window has Balloon Status == 4
+- else 0
+
+Gating-ok label at window level:
+- label_gating_ok = 1 if ANY sample has Gating Mode == "automated"
+- else 0
+
+Because this file has no meaningful "Automated":
+- all window-level gating labels become 0 in current pipeline for this file.
+
+
+SECTION 12: WINDOW-LEVEL FEATURE/LABEL PROFILE (2s WINDOWS)
+------------------------------------------------------------
+Windowing config used for analysis:
+- window_sec: 2.0
+- sample_rate_hz: 50
+- samples per window: 100
+- non-overlap windows
+
+Computed windows: 1,730
+
+Window label counts:
+- label_breath_hold: 1 -> 143 windows
+- label_breath_hold: 0 -> 1,587 windows
+- label_gating_ok: 1 -> 0 windows
+- label_gating_ok: 0 -> 1,730 windows
+
+Window feature summary (selected):
+- vol_mean: mean 0.04816, min -0.27600, max 1.22060
+- vol_std: mean 0.03837, min 0.00000, max 0.39677
+- vol_range: mean 0.12262, min 0.00000, max 1.26400
+- frac_balloon_inflated: mean 0.07183, max 1.00000
+- frac_balloon_deflated: mean 0.83587, max 1.00000
+- frac_patient_switch_on: mean 0.48542, min 0.00000, max 1.00000
+- frac_gating_automated: always 0.00000 in this file
+
+Interpretation:
+- Breath-hold windows exist but are minority (~8.3%).
+- Gating-ok task is single-class for this file under current mapping.
+
+
+SECTION 13: DATA QUALITY FINDINGS
+---------------------------------
+Good:
+- Perfectly regular sampling interval in parsed data.
+- Very large sample count and long duration.
+- Rich state dynamics for balloon and switch channels.
+
+Limitations in this file:
+- Gating Mode dominated by placeholders/non-automated entries.
+- Very sparse status=5 fault signal (not enough for fault learning).
+- Single-file context cannot represent full patient variability.
+
+
+SECTION 14: WHAT THIS FILE IS USEFUL FOR
+----------------------------------------
+Highly useful for:
+1) Breath-hold modeling (window-based classical ML)
+2) Episode/rhythm temporal analysis
+3) Feature engineering sanity checks
+4) Stress-testing parser and fixed-window pipeline at scale
+
+Less useful alone for:
+1) Learning positive gating_ok class (Automated mode missing)
+2) Fault prediction (status 5 almost absent)
+
+
+SECTION 15: WHAT THIS FILE DOES NOT MEAN
+----------------------------------------
+- It does NOT diagnose cancer.
+- It does NOT represent tumor stage/progression.
+- It does NOT by itself authorize treatment operation.
+
+It DOES represent:
+- treatment-condition signal behavior,
+- respiratory/gating state dynamics,
+- data source for decision-support model training.
+
+
+SECTION 16: DIRECT EXAMPLE INTERPRETATIONS
+------------------------------------------
+Example A:
+Row: 89.08;0.004;1;0;-;-;-
+Meaning:
+- early session,
+- near-zero positive volume,
+- deflated balloon,
+- switch disabled,
+- gating fields placeholder.
+
+Example B:
+Row: 302.22;-0.104;4;1;-;-;-
+Meaning:
+- later session,
+- negative volume relative to baseline,
+- inflated balloon (hold-like state),
+- switch enabled.
+
+
+SECTION 17: PRESENTATION TALK TRACK (READY TO USE)
+---------------------------------------------------
+"This sample file is a 50Hz, ~57.7-minute respiratory-gating recording with
+173,032 rows. Balloon status is mostly deflated but includes 19 inflated
+episodes with median duration ~15s, making it valuable for breath-hold
+classification. Under our current label logic, gating_ok is always 0 in this
+file because Automated mode is not present in meaningful entries. Therefore,
+this file is strong for breath-state modeling but weak as a standalone source
+for positive gating_ok examples."
+
+
+SECTION 18: RESEARCH NOTES / ACTIONABLE NEXT STEPS
+---------------------------------------------------
+1) For breath-hold model quality:
+  - keep this file; it has robust hold episodes and clean timing.
+
+2) For gating_ok model quality:
+  - add files containing explicit "Automated" entries to avoid class collapse.
+
+3) For reliability:
+  - include per-file class-balance checks before training.
+
+4) For reporting:
+  - report window-level class distribution per file,
+  - highlight files with single-class labels for any task.
+
+
+SECTION 19: FINAL SUMMARY
+-------------------------
+This sample session is a high-quality, long-duration breathing/gating log with
+regular sampling and repeatable inflated episodes. It provides strong signal for
+breath-hold versus non-hold behavior, while offering limited positive evidence
+for gating_ok due to missing Automated mode. It is a valuable ML input file for
+respiratory-state modeling, temporal pattern analysis, and pipeline validation.
+
+================================================================================
+End of detailed knowledge file
+================================================================================
