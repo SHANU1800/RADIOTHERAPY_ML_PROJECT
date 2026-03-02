@@ -158,15 +158,27 @@ def show():
 
     # --- Quick start ---
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
-    st.markdown(f'<p class="page-header">{icon_html("target", 24)} Quick start</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="page-header">{icon_html("target", 24)} Quick Start</p>', unsafe_allow_html=True)
 
-    st.markdown("""
-1. **Train a model** (if not done):  `python -m src.train --dataset dataset/`
-2. Navigate to **Upload & Predict** in the sidebar
-3. Upload a `.dat`, `.txt`, or `.csv` breathing curve file
-4. Review the detailed analysis: charts, metrics, clinical zones, glossary
-5. Download predictions (CSV) or a summary report (TXT) for your records
-    """)
+    qs1, qs2 = st.columns(2)
+    with qs1:
+        st.markdown("""
+**Getting Started:**
+1. Train classical models: `python -m src.train`
+2. Train DL models: `python -m src.dl_train --task breath_hold`
+3. Navigate to **Upload & Predict** in the sidebar
+4. Upload a `.dat` / `.txt` / `.csv` breathing curve file
+5. Review key insights, charts, signal analysis, and Grad-CAM
+""")
+    with qs2:
+        st.markdown("""
+**Analysis Tips:**
+- Use the **Breathing Curve** tab for quick visual assessment
+- Check **Key Insights** panel for auto-generated summary
+- Use **Signal & Grad-CAM** tab to see what the DL model focuses on
+- Filter the **Data & Export** tab by class or confidence level
+- Use **Dataset Explorer** to browse existing patient files
+""")
 
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
     st.caption("See `README_ML.md` for full documentation on the ML pipeline, data formats, and training.")

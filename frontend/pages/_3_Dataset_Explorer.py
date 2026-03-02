@@ -34,210 +34,210 @@ def load_patient_data(patient_id: str, file_id: str, file_path_str: str):
 def show():
     st.markdown(f'<p class="page-header">{icon_html("search", 28)} Dataset Explorer</p>', unsafe_allow_html=True)
     st.markdown('<p class="page-subtitle">Browse and visualize existing patient breathing curve data.</p>', unsafe_allow_html=True)
-    
-    with st.expander("Dataset-wide stats (from analysis)"):
-        try:
-            file_summary, patient_summary, _ = load_summary_stats()
-            if len(file_summary) > 0 or len(patient_summary) > 0:
-                st.caption("**Total files:** %d | **Total duration:** %s" % (
-                    len(file_summary),
-                    "%.1f s" % patient_summary["duration_s"].sum() if len(patient_summary) > 0 and "duration_s" in patient_summary.columns else "N/A",
-                ))
-                if len(patient_summary) > 0:
-                    st.dataframe(patient_summary.head(20), use_container_width=True, height=200)
-                    st.caption("Patient-level summary (first 20). Run analysis/analyze_dataset.py to refresh.")
-            else:
-                st.caption("No summary data yet. Run analysis/analyze_dataset.py to generate file_summary.csv and patient_summary.csv.")
-        except Exception as e:
-            st.caption("Could not load summary stats: " + user_facing_message(e))
-    
-    # Patient selector
+
+    # Patient selector with search
     patients = get_patient_list()
     if len(patients) == 0:
         st.warning("No patients found in dataset directory.")
         return
-    
-    patient_id = st.selectbox("Select Patient", patients)
-    
-    # File selector
-    files = get_file_list(patient_id)
-    if len(files) == 0:
-        st.warning(f"No curve files found for patient: {patient_id}")
+
+    sel1, sel2 = st.columns([1, 1])
+    with sel1:
+        search_term = st.text_input(
+            "Search patients",
+            placeholder="Type to filter...",
+            key="patient_search",
+        )
+        if search_term:
+            filtered_patients = [p for p in patients if search_term.lower() in p.lower()]
+        else:
+            filtered_patients = patients
+        if not filtered_patients:
+            st.warning(f"No patients matching '{search_term}'")
+            filtered_patients = patients
+        patient_id = st.selectbox("Select Patient", filtered_patients, key="patient_select")
+
+    with sel2:
+        files = get_file_list(patient_id)
+        if len(files) == 0:
+            st.warning(f"No curve files found for patient: {patient_id}")
+            return
+        file_options = [f"{fid} ({path.name})" for fid, path in files]
+        file_idx = st.selectbox("Select File", range(len(file_options)), format_func=lambda i: file_options[i])
+
+    if file_idx is None:
         return
-    
-    file_options = [f"{fid} ({path.name})" for fid, path in files]
-    file_idx = st.selectbox("Select File", range(len(file_options)), format_func=lambda i: file_options[i])
-    
-    if file_idx is not None:
-        file_id, file_path = files[file_idx]
-        
-        with st.spinner("Loading file..."):
-            try:
-                df = load_patient_data(patient_id, file_id, str(file_path))
-                
-                if len(df) == 0:
-                    st.error(user_facing_message(ValueError("Empty file or parsing error")))
-                    return
-                
-                # Statistics panel
-                st.subheader("Statistics")
-                col1, col2, col3, col4 = st.columns(4)
-                
-                duration = df["Session Time"].max() - df["Session Time"].min()
-                with col1:
-                    st.metric("Duration", f"{duration:.2f}s")
-                with col2:
-                    st.metric("Rows", len(df))
-                with col3:
-                    st.metric("Volume Min", f"{df['Volume (liters)'].min():.3f}L")
-                with col4:
-                    st.metric("Volume Max", f"{df['Volume (liters)'].max():.3f}L")
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Volume Mean", f"{df['Volume (liters)'].mean():.3f}L")
-                with col2:
-                    st.metric("Volume Std", f"{df['Volume (liters)'].std():.3f}L")
-                
-                # Balloon status counts (Plotly for export and consistency)
-                if "Balloon Valve Status" in df.columns:
-                    st.subheader("Balloon Valve Status")
-                    balloon_counts = df["Balloon Valve Status"].astype(str).value_counts()
-                    fig_balloon = plot_bar_counts(balloon_counts, "Balloon Valve Status", "Status")
-                    st.plotly_chart(fig_balloon, use_container_width=True, key="explorer_balloon")
-                    png_b = export_fig_png(fig_balloon)
-                    if png_b:
-                        st.download_button("Download PNG", data=png_b, file_name="balloon_status.png", mime="image/png", key="dl_balloon_png")
-                
-                # Gating mode counts
-                if "Gating Mode" in df.columns:
-                    st.subheader("Gating Mode")
-                    gating_counts = df["Gating Mode"].astype(str).value_counts()
-                    fig_gating = plot_bar_counts(gating_counts, "Gating Mode", "Mode")
-                    st.plotly_chart(fig_gating, use_container_width=True, key="explorer_gating")
-                    png_g = export_fig_png(fig_gating)
-                    if png_g:
-                        st.download_button("Download PNG", data=png_g, file_name="gating_mode.png", mime="image/png", key="dl_gating_png")
-                
-                # Optional volume distribution (research)
-                with st.expander("Volume distribution (histogram)"):
-                    fig_hist = plot_volume_histogram(df["Volume (liters)"], title=f"Volume (L) - {file_path.name}", bins=50)
-                    st.plotly_chart(fig_hist, use_container_width=True, key="explorer_hist")
-                
-                # Visualization
-                st.subheader("Breathing Curve")
-                show_balloon = st.checkbox("Show Balloon Valve Status", value=True)
-                show_gating = st.checkbox("Show Gating Mode", value=False)
-                show_rolling_mean = st.checkbox("Show rolling mean", value=False, help="Overlay rolling mean of volume")
-                
+
+    file_id, file_path = files[file_idx]
+
+    with st.spinner("Loading file..."):
+        try:
+            df = load_patient_data(patient_id, file_id, str(file_path))
+
+            if len(df) == 0:
+                st.error(user_facing_message(ValueError("Empty file or parsing error")))
+                return
+
+            duration = df["Session Time"].max() - df["Session Time"].min()
+            vol = df["Volume (liters)"]
+
+            # Compact stats row
+            st.markdown(
+                '<div class="stat-row">'
+                f'<span class="stat-pill">{duration:.1f}s <small>duration</small></span>'
+                f'<span class="stat-pill">{len(df):,} <small>rows</small></span>'
+                f'<span class="stat-pill">{vol.min():.3f}L <small>min vol</small></span>'
+                f'<span class="stat-pill">{vol.max():.3f}L <small>max vol</small></span>'
+                f'<span class="stat-pill">{vol.mean():.3f}L <small>mean vol</small></span>'
+                f'<span class="stat-pill">{vol.std():.3f}L <small>std vol</small></span>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+            # Tabbed exploration
+            tab_viz, tab_signals, tab_stats, tab_windows = st.tabs([
+                "Breathing Curve", "Signal Channels", "Statistics & Status", "Window Breakdown",
+            ])
+
+            # --- TAB: Breathing Curve ---
+            with tab_viz:
+                show_balloon = st.checkbox("Show Balloon Valve Status", value=True, key="exp_balloon")
+                show_rolling_mean = st.checkbox("Show rolling mean", value=True, key="exp_rolling")
+
                 fig = plot_breathing_curve(
                     df,
                     show_balloon=show_balloon,
-                    show_gating=show_gating,
                     show_rolling_mean=show_rolling_mean,
-                    subtitle=file_path.name,
+                    subtitle=f"{file_path.name} | Patient: {patient_id}",
                 )
                 st.plotly_chart(fig, use_container_width=True, key="explorer_curve")
-                st.caption("**Research context:** File: %s | Patient: %s | Duration: %.2f s" % (file_path.name, patient_id, duration))
-                png_curve = export_fig_png(fig)
-                if png_curve:
-                    st.download_button("Download chart (PNG)", data=png_curve, file_name="breathing_curve.png", mime="image/png", key="dl_explorer_curve_png")
-                curve_csv = df[["Session Time", "Volume (liters)"]].head(15000).to_csv(index=False)
-                st.download_button("Download curve data (CSV)", data=curve_csv, file_name=f"curve_{patient_id}_{file_id}.csv", mime="text/csv", key="dl_explorer_curve_csv")
-                
+
+                dl1, dl2 = st.columns(2)
+                with dl1:
+                    png_curve = export_fig_png(fig)
+                    if png_curve:
+                        st.download_button("Download curve (PNG)", data=png_curve, file_name="breathing_curve.png", mime="image/png", key="dl_explorer_curve_png")
+                with dl2:
+                    curve_csv = df[["Session Time", "Volume (liters)"]].head(15000).to_csv(index=False)
+                    st.download_button("Download curve data (CSV)", data=curve_csv, file_name=f"curve_{patient_id}_{file_id}.csv", mime="text/csv", key="dl_explorer_curve_csv")
+
+            # --- TAB: Signal Channels ---
+            with tab_signals:
+                st.caption("Multi-channel signal decomposition for this file.")
+                try:
+                    from frontend.utils.visualization import plot_signal_analysis, plot_frequency_spectrum
+                    fig_sig = plot_signal_analysis(df, sample_rate_hz=cfg.SAMPLE_RATE_HZ)
+                    st.plotly_chart(fig_sig, use_container_width=True, key="explorer_signal")
+
+                    st.markdown("#### Frequency Spectrum")
+                    vol_arr = pd.to_numeric(df["Volume (liters)"], errors="coerce").fillna(0).values
+                    if len(vol_arr) > 10000:
+                        vol_arr = vol_arr[:10000]
+                    fig_spec = plot_frequency_spectrum(vol_arr, sample_rate=cfg.SAMPLE_RATE_HZ)
+                    st.plotly_chart(fig_spec, use_container_width=True, key="explorer_spectrum")
+                except Exception as e:
+                    st.warning(f"Could not plot signal analysis: {e}")
+
+            # --- TAB: Statistics & Status ---
+            with tab_stats:
+                sc1, sc2 = st.columns(2)
+                with sc1:
+                    if "Balloon Valve Status" in df.columns:
+                        st.markdown("#### Balloon Valve Status")
+                        balloon_counts = df["Balloon Valve Status"].astype(str).value_counts()
+                        fig_balloon = plot_bar_counts(balloon_counts, "Balloon Valve Status", "Status")
+                        st.plotly_chart(fig_balloon, use_container_width=True, key="explorer_balloon")
+                with sc2:
+                    if "Gating Mode" in df.columns:
+                        st.markdown("#### Gating Mode")
+                        gating_counts = df["Gating Mode"].astype(str).value_counts()
+                        fig_gating = plot_bar_counts(gating_counts, "Gating Mode", "Mode")
+                        st.plotly_chart(fig_gating, use_container_width=True, key="explorer_gating")
+
+                st.markdown("#### Volume Distribution")
+                fig_hist = plot_volume_histogram(vol, title=f"Volume (L) — {file_path.name}", bins=50)
+                st.plotly_chart(fig_hist, use_container_width=True, key="explorer_hist")
+
                 session_blocks = get_patient_session_ini(cfg.DATASET_DIR, patient_id)
                 if session_blocks:
                     with st.expander("Session metadata (session.ini)"):
                         for i, block in enumerate(session_blocks):
                             st.caption("Block %d" % (i + 1))
                             st.json(block)
-                
+
                 file_stats = {
-                    "patient_id": [patient_id],
-                    "file": [file_path.name],
-                    "duration_s": [round(duration, 2)],
-                    "rows": [len(df)],
-                    "volume_min_L": [round(df["Volume (liters)"].min(), 4)],
-                    "volume_max_L": [round(df["Volume (liters)"].max(), 4)],
-                    "volume_mean_L": [round(df["Volume (liters)"].mean(), 4)],
+                    "patient_id": [patient_id], "file": [file_path.name],
+                    "duration_s": [round(duration, 2)], "rows": [len(df)],
+                    "volume_min_L": [round(vol.min(), 4)],
+                    "volume_max_L": [round(vol.max(), 4)],
+                    "volume_mean_L": [round(vol.mean(), 4)],
                 }
                 if "Balloon Valve Status" in df.columns:
                     bc = df["Balloon Valve Status"].astype(str).value_counts()
                     file_stats["balloon_counts"] = ["; ".join("%s: %d" % (k, v) for k, v in bc.items())]
-                if "Gating Mode" in df.columns:
-                    gc = df["Gating Mode"].astype(str).value_counts()
-                    file_stats["gating_counts"] = ["; ".join("%s: %d" % (k, v) for k, v in gc.items())]
                 file_stats_df = pd.DataFrame(file_stats)
-                st.download_button("Download this file's stats (CSV)", data=file_stats_df.to_csv(index=False), file_name=f"file_stats_{patient_id}_{file_id}.csv", mime="text/csv", key="dl_explorer_file_stats")
-                
-                # Window breakdown (ground truth labels)
-                st.subheader("Window Breakdown (Ground Truth)")
-                window_sec = st.slider("Window Size (seconds)", 1.0, 5.0, cfg.WINDOW_SEC, 0.1, key="explorer_window")
-                
-                if st.button("Compute Windows"):
-                    with st.spinner("Building windows..."):
-                        try:
-                            windows = build_windows(
-                                df,
-                                window_sec=window_sec,
-                                sample_rate_hz=cfg.SAMPLE_RATE_HZ,
-                                min_rows=cfg.MIN_WINDOW_ROWS,
-                            )
-                        except Exception as e:
-                            st.error("Error building windows: " + user_facing_message(e))
-                            windows = None
-                        
-                        if windows is not None and len(windows) > 0:
-                            st.info(f"Created {len(windows)} windows")
-                            
-                            # Plot with ground truth labels
-                            fig = plot_breathing_curve(df, predictions=windows.rename(columns={"label_breath_hold": "prediction"}))
-                            st.plotly_chart(fig, use_container_width=True, key="explorer_windows_curve")
-                            
-                            # Window summary
-                            breath_hold_count = (windows["label_breath_hold"] == 1).sum()
-                            free_breathing_count = (windows["label_breath_hold"] == 0).sum()
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                st.metric("Breath-hold Windows", breath_hold_count)
-                            with col2:
-                                st.metric("Free-breathing Windows", free_breathing_count)
-                            
-                            wdisp = windows[["time_start", "time_end", "label_breath_hold", "vol_mean", "vol_std"]].head(500)
-                            st.dataframe(wdisp, use_container_width=True)
-                            if len(windows) > 500:
-                                st.caption(f"Showing first 500 of {len(windows)} windows.")
-                        else:
-                            if windows is not None:
-                                st.warning("No windows produced (file too short?)")
-                
-            except Exception as e:
-                st.error("Error loading file: " + user_facing_message(e))
-                st.exception(e)
-    
-    # Report generation
-    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
-    st.markdown(f'<p class="page-header" style="font-size:1.3rem;">{icon_html("file", 22)} Generate Report</p>', unsafe_allow_html=True)
-    if st.button("Generate Patient Report with AI", help="Generate AI-powered analysis report for this patient"):
-        try:
-            from frontend.utils.llm_helper import generate_report, is_llm_available
-            if is_llm_available():
-                with st.spinner("Generating report..."):
-                    analysis_data = {
-                        "patient_id": patient_id,
-                        "files": [f[1].name for f in files],
-                        "selected_file": files[file_idx][1].name if file_idx < len(files) else ""
-                    }
-                    report = generate_report(analysis_data, "patient_summary")
-                    st.markdown("### Generated Report")
-                    st.markdown(report)
-                    st.download_button(
-                        label="Download Report",
-                        data=report,
-                        file_name=f"patient_report_{patient_id}.txt",
-                        mime="text/plain"
+                st.download_button("Download file stats (CSV)", data=file_stats_df.to_csv(index=False),
+                                   file_name=f"file_stats_{patient_id}_{file_id}.csv", mime="text/csv", key="dl_explorer_file_stats")
+
+            # --- TAB: Window Breakdown (auto-compute) ---
+            with tab_windows:
+                st.markdown("#### Ground Truth Window Labels")
+                window_sec = st.slider("Window Size (s)", 1.0, 5.0, cfg.WINDOW_SEC, 0.5, key="explorer_window")
+
+                try:
+                    windows = build_windows(
+                        df,
+                        window_sec=window_sec,
+                        sample_rate_hz=cfg.SAMPLE_RATE_HZ,
+                        min_rows=cfg.MIN_WINDOW_ROWS,
                     )
-            else:
-                st.info("AI features require Ollama API. Go to AI Assistant page for setup instructions.")
+                except Exception as e:
+                    st.error("Error building windows: " + user_facing_message(e))
+                    windows = None
+
+                if windows is not None and len(windows) > 0:
+                    bh = int((windows["label_breath_hold"] == 1).sum())
+                    fb = int((windows["label_breath_hold"] == 0).sum())
+                    total_w = len(windows)
+
+                    st.markdown(
+                        '<div class="stat-row">'
+                        f'<span class="stat-pill">{total_w} <small>total windows</small></span>'
+                        f'<span class="stat-pill">{bh} ({100*bh/total_w:.0f}%) <small>breath-hold</small></span>'
+                        f'<span class="stat-pill">{fb} ({100*fb/total_w:.0f}%) <small>free-breathing</small></span>'
+                        '</div>',
+                        unsafe_allow_html=True,
+                    )
+
+                    fig_w = plot_breathing_curve(df, predictions=windows.rename(columns={"label_breath_hold": "prediction"}))
+                    st.plotly_chart(fig_w, use_container_width=True, key="explorer_windows_curve")
+
+                    display_cols = ["time_start", "time_end", "label_breath_hold", "vol_mean", "vol_std"]
+                    avail = [c for c in display_cols if c in windows.columns]
+                    st.dataframe(windows[avail].head(500), use_container_width=True)
+                    if len(windows) > 500:
+                        st.caption(f"Showing first 500 of {len(windows)} windows.")
+                elif windows is not None:
+                    st.warning("No windows produced (file too short?)")
+
         except Exception as e:
-            st.warning(f"Could not generate report: {user_facing_message(e)}")
+            st.error("Error loading file: " + user_facing_message(e))
+            st.exception(e)
+
+    # Dataset-wide stats
+    with st.expander("Dataset-wide statistics"):
+        try:
+            file_summary, patient_summary, _ = load_summary_stats()
+            if len(patient_summary) > 0:
+                st.markdown(
+                    f'<div class="stat-row">'
+                    f'<span class="stat-pill">{len(patient_summary)} <small>patients</small></span>'
+                    f'<span class="stat-pill">{len(file_summary)} <small>files</small></span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+                st.dataframe(patient_summary.head(20), use_container_width=True, height=200)
+            else:
+                st.caption("Run analysis/analyze_dataset.py to generate summaries.")
+        except Exception as e:
+            st.caption("Could not load summary stats: " + user_facing_message(e))

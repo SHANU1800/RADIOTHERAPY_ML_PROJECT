@@ -1,0 +1,23 @@
+{
+  "model_name": "LSTM",
+  "task": "breath_hold",
+  "accuracy": 0.9393177119228119,
+  "balanced_accuracy": 0.8096249082469709,
+  "f1": 0.7121137812653261,
+  "roc_auc": 0.9054772031845445,
+  "confusion_matrix": [
+    [
+      25081,
+      537
+    ],
+    [
+      1224,
+      2178
+    ]
+  ],
+  "epochs_trained": 28,
+  "input_shape": [
+    100,
+    1
+  ]
+}

@@ -567,6 +567,234 @@ def plot_state_transitions(
     return fig
 
 
+def plot_signal_analysis(
+    df: "pd.DataFrame",
+    sample_rate_hz: float = 50.0,
+    height: int = 700,
+) -> "go.Figure":
+    """
+    Multi-panel signal analysis: volume, derivative, 2nd derivative, envelope,
+    and balloon valve status over time.
+    """
+    if go is None or pd is None or np is None:
+        raise ImportError("plotly, pandas, numpy required")
+
+    from plotly.subplots import make_subplots
+
+    vol = pd.to_numeric(df["Volume (liters)"], errors="coerce").fillna(0.0)
+    time = pd.to_numeric(df["Session Time"], errors="coerce").fillna(0.0)
+    deriv = vol.diff().fillna(0.0)
+    deriv2 = deriv.diff().fillna(0.0)
+    envelope = vol.rolling(window=25, min_periods=1, center=True).std().fillna(0.0)
+
+    has_balloon = "Balloon Valve Status" in df.columns
+    n_rows = 5 if has_balloon else 4
+    titles = ["Volume (L)", "dV/dt (derivative)", "d²V/dt² (2nd derivative)", "Envelope (rolling std)"]
+    if has_balloon:
+        titles.append("Balloon Valve Status")
+
+    fig = make_subplots(rows=n_rows, cols=1, shared_xaxes=True, vertical_spacing=0.04, subplot_titles=titles)
+
+    step = max(1, len(df) // MAX_PLOT_POINTS)
+    t_s = time.values[::step]
+    fig.add_trace(go.Scatter(x=t_s, y=vol.values[::step], mode="lines", line=dict(color="#3498db", width=1.2), name="Volume"), row=1, col=1)
+    fig.add_trace(go.Scatter(x=t_s, y=deriv.values[::step], mode="lines", line=dict(color="#e67e22", width=1), name="dV/dt"), row=2, col=1)
+    fig.add_trace(go.Scatter(x=t_s, y=deriv2.values[::step], mode="lines", line=dict(color="#9b59b6", width=1), name="d²V/dt²"), row=3, col=1)
+    fig.add_trace(go.Scatter(x=t_s, y=envelope.values[::step], mode="lines", line=dict(color="#2ecc71", width=1), name="Envelope"), row=4, col=1)
+    if has_balloon:
+        balloon = pd.to_numeric(df["Balloon Valve Status"], errors="coerce").fillna(0)
+        fig.add_trace(go.Scatter(x=t_s, y=balloon.values[::step], mode="lines", line=dict(color="#e74c3c", width=1), name="Balloon"), row=5, col=1)
+
+    fig.update_layout(height=height, showlegend=False, margin=dict(t=30, b=30))
+    fig.update_xaxes(title_text="Time (s)", row=n_rows, col=1)
+    return fig
+
+
+def plot_frequency_spectrum(
+    signal: "np.ndarray",
+    sample_rate: float = 50.0,
+    title: str = "Frequency Spectrum",
+    height: int = 350,
+) -> "go.Figure":
+    """Plot frequency spectrum (FFT magnitude) of a 1-D signal."""
+    if go is None or np is None:
+        raise ImportError("plotly and numpy required")
+    n = len(signal)
+    if n < 4:
+        fig = go.Figure()
+        fig.update_layout(title=title, height=height)
+        return fig
+
+    windowed = signal * np.hanning(n)
+    fft_vals = np.fft.rfft(windowed)
+    magnitudes = np.abs(fft_vals)
+    freqs = np.fft.rfftfreq(n, d=1.0 / sample_rate)
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=freqs[1:], y=magnitudes[1:],
+        mode="lines", line=dict(color="#9b59b6", width=1.5), name="Magnitude",
+    ))
+    fig.update_layout(
+        title=title, xaxis_title="Frequency (Hz)", yaxis_title="Magnitude",
+        height=height, xaxis=dict(showgrid=True), yaxis=dict(showgrid=True),
+    )
+    return fig
+
+
+def plot_gradcam_overlay(
+    time_axis: "np.ndarray",
+    signal: "np.ndarray",
+    importance: "np.ndarray",
+    title: str = "Grad-CAM: Model Focus Regions",
+    height: int = 400,
+) -> "go.Figure":
+    """
+    Overlay Grad-CAM heatmap on the breathing signal to show which time
+    steps the DL model focuses on for its prediction.
+    """
+    if go is None or np is None:
+        raise ImportError("plotly and numpy required")
+    from plotly.subplots import make_subplots
+
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08,
+                        row_heights=[0.7, 0.3], subplot_titles=["Signal + Attention", "Importance Heatmap"])
+
+    fig.add_trace(go.Scatter(
+        x=time_axis, y=signal, mode="lines", line=dict(color="#3498db", width=1.5), name="Volume",
+    ), row=1, col=1)
+
+    imp_norm = importance / (importance.max() + 1e-10)
+    n_segments = min(100, len(time_axis))
+    step = max(1, len(time_axis) // n_segments)
+    for i in range(0, len(time_axis) - step, step):
+        seg_imp = float(np.mean(imp_norm[i:i + step]))
+        color = f"rgba(231, 76, 60, {max(0.05, seg_imp)})"
+        fig.add_vrect(
+            x0=float(time_axis[i]), x1=float(time_axis[min(i + step, len(time_axis) - 1)]),
+            fillcolor=color, layer="below", line_width=0, row=1, col=1,
+        )
+
+    fig.add_trace(go.Heatmap(
+        z=[imp_norm], x=time_axis, y=["Importance"],
+        colorscale="Reds", showscale=True, colorbar=dict(title="Importance", len=0.3, y=0.15),
+    ), row=2, col=1)
+
+    fig.update_layout(height=height, title=title, showlegend=True, margin=dict(t=50, b=30))
+    fig.update_xaxes(title_text="Time (s)", row=2, col=1)
+    fig.update_yaxes(title_text="Volume (L)", row=1, col=1)
+    return fig
+
+
+def plot_dl_roc_curves(
+    dl_roc_data: Dict[str, Dict],
+    title: str = "DL Models — ROC Curves",
+    height: int = 450,
+) -> "go.Figure":
+    """Plot ROC curves for multiple DL models on one chart."""
+    if go is None or np is None:
+        raise ImportError("plotly and numpy required")
+    colors = ["#3498db", "#e74c3c", "#2ecc71", "#9b59b6", "#f39c12", "#1abc9c", "#e67e22"]
+    fig = go.Figure()
+    for i, (name, data) in enumerate(dl_roc_data.items()):
+        fpr = data.get("fpr", [])
+        tpr = data.get("tpr", [])
+        auc_val = data.get("auc", 0)
+        fig.add_trace(go.Scatter(
+            x=fpr, y=tpr, mode="lines",
+            name=f"{name} (AUC={auc_val:.3f})",
+            line=dict(color=colors[i % len(colors)], width=2),
+        ))
+    fig.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode="lines", name="Random",
+                             line=dict(color="#95a5a6", width=1, dash="dash")))
+    fig.update_layout(
+        title=title, xaxis_title="False Positive Rate", yaxis_title="True Positive Rate",
+        xaxis=dict(showgrid=True, range=[0, 1]), yaxis=dict(showgrid=True, range=[0, 1]),
+        height=height,
+    )
+    return fig
+
+
+def plot_dl_pr_curves(
+    dl_pr_data: Dict[str, Dict],
+    title: str = "DL Models — Precision-Recall Curves",
+    height: int = 450,
+) -> "go.Figure":
+    """Plot precision-recall curves for multiple DL models on one chart."""
+    if go is None or np is None:
+        raise ImportError("plotly and numpy required")
+    colors = ["#3498db", "#e74c3c", "#2ecc71", "#9b59b6", "#f39c12", "#1abc9c", "#e67e22"]
+    fig = go.Figure()
+    for i, (name, data) in enumerate(dl_pr_data.items()):
+        prec = data.get("precision", [])
+        rec = data.get("recall", [])
+        ap = data.get("average_precision", 0)
+        fig.add_trace(go.Scatter(
+            x=rec, y=prec, mode="lines",
+            name=f"{name} (AP={ap:.3f})",
+            line=dict(color=colors[i % len(colors)], width=2),
+        ))
+    fig.update_layout(
+        title=title, xaxis_title="Recall", yaxis_title="Precision",
+        xaxis=dict(showgrid=True, range=[0, 1]), yaxis=dict(showgrid=True, range=[0, 1.02]),
+        height=height,
+    )
+    return fig
+
+
+def plot_dl_vs_classical_comparison(
+    classical_metrics: Dict[str, Dict],
+    dl_metrics: Dict[str, Dict],
+    metric_name: str = "balanced_accuracy",
+    title: str = "Classical ML vs Deep Learning",
+    height: int = 400,
+) -> "go.Figure":
+    """Bar chart comparing classical ML and DL model performance side by side."""
+    if go is None:
+        raise ImportError("plotly required")
+    fig = go.Figure()
+    cl_names = list(classical_metrics.keys())
+    cl_vals = [classical_metrics[n].get(metric_name, 0) for n in cl_names]
+    dl_names = [f"DL-{n}" for n in dl_metrics.keys()]
+    dl_vals = [dl_metrics[n].get(metric_name, 0) for n in dl_metrics.keys()]
+
+    fig.add_trace(go.Bar(x=cl_names, y=cl_vals, name="Classical ML", marker_color="#3498db"))
+    fig.add_trace(go.Bar(x=dl_names, y=dl_vals, name="Deep Learning", marker_color="#e74c3c"))
+    fig.update_layout(
+        title=title, barmode="group", xaxis_title="Model", yaxis_title=metric_name.replace("_", " ").title(),
+        yaxis=dict(range=[0, 1.05], showgrid=True), height=height,
+    )
+    return fig
+
+
+def plot_dl_metrics_radar(
+    metrics: Dict[str, float],
+    model_name: str,
+    title: str = "Model Metrics Profile",
+    height: int = 400,
+) -> "go.Figure":
+    """Radar chart of a single DL model's metrics for quick assessment."""
+    if go is None:
+        raise ImportError("plotly required")
+    metric_keys = ["accuracy", "balanced_accuracy", "f1", "precision", "recall", "specificity", "mcc", "roc_auc"]
+    labels = ["Accuracy", "Bal. Accuracy", "F1", "Precision", "Recall", "Specificity", "MCC", "ROC-AUC"]
+    vals = [max(0, metrics.get(k, 0)) for k in metric_keys]
+    vals_closed = vals + [vals[0]]
+    labels_closed = labels + [labels[0]]
+
+    fig = go.Figure(data=go.Scatterpolar(
+        r=vals_closed, theta=labels_closed, fill="toself",
+        fillcolor="rgba(231, 76, 60, 0.2)", line=dict(color="#e74c3c", width=2),
+        name=model_name,
+    ))
+    fig.update_layout(
+        title=f"{title} — {model_name}",
+        polar=dict(radialaxis=dict(visible=True, range=[0, 1.05])),
+        height=height, margin=dict(t=50, b=30),
+    )
+    return fig
+
+
 def export_fig_png(fig: "go.Figure") -> Optional[bytes]:
     """Export Plotly figure as PNG bytes if kaleido is available; otherwise return None."""
     try:

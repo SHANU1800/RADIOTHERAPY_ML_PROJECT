@@ -228,6 +228,88 @@ section[data-testid="stSidebar"] hr { border-color: #334155; }
     font-weight: 600;
 }
 .stExpander { border: 1px solid var(--border); border-radius: 10px; }
+
+/* ---- key insights panel ---- */
+.insights-panel {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #7dd3fc;
+    border-radius: 14px;
+    padding: 1.1rem 1.5rem;
+    margin: 0.75rem 0 1rem 0;
+}
+.insights-panel h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.05rem;
+    color: #0369a1;
+}
+.insights-panel ul {
+    margin: 0; padding-left: 1.2rem;
+    color: #0c4a6e;
+    font-size: 0.92rem;
+    line-height: 1.7;
+}
+
+/* ---- compact stat row ---- */
+.stat-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 0.5rem 0;
+}
+.stat-pill {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+}
+.stat-pill small {
+    font-weight: 400;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+/* ---- search box styling ---- */
+.patient-search input {
+    border-radius: 8px !important;
+}
+
+/* ---- sticky result header ---- */
+.sticky-result {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #fff;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.5rem;
+}
+
+/* ---- tab content compact ---- */
+.compact-tab-content .stPlotlyChart {
+    margin-bottom: 0.5rem;
+}
+
+/* ---- quick action button ---- */
+.quick-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: background .15s;
+    text-decoration: none;
+}
+.quick-action:hover { background: #1d4ed8; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -242,29 +324,36 @@ st.sidebar.markdown(
 st.sidebar.markdown("---")
 
 _NAV_ITEMS = [
-    ("Upload & Predict", "upload"),
-    ("Home",             "lungs"),
-    ("Dataset Explorer", "search"),
-    ("Model Performance","chart"),
-    ("Batch Analysis",   "package"),
-    ("AI Assistant",     "robot"),
+    ("Home",              "lungs"),
+    ("Upload & Predict",  "upload"),
+    ("Dataset Explorer",  "search"),
+    ("Model Performance", "chart"),
+    ("Batch Analysis",    "package"),
+    ("AI Assistant",      "robot"),
 ]
 _nav_labels = [item[0] for item in _NAV_ITEMS]
 page = st.sidebar.radio("Navigation", _nav_labels, label_visibility="collapsed")
 
-# Status dots
+# Status indicators
 import config as cfg
 _model_ok = (cfg.MODELS_DIR / "best_model.pkl").exists()
 _ds_ok = cfg.DATASET_DIR.exists() and any(cfg.DATASET_DIR.iterdir()) if cfg.DATASET_DIR.exists() else False
+_dl_ok = any((cfg.MODELS_DIR).glob("dl_*_model.keras")) if cfg.MODELS_DIR.exists() else False
+_dl_count = len(list((cfg.MODELS_DIR).glob("dl_*_model.keras"))) if cfg.MODELS_DIR.exists() else 0
+
 st.sidebar.markdown("---")
 st.sidebar.markdown(
+    f'<div style="display:flex;flex-direction:column;gap:6px;">'
     f'<span class="badge {"badge-green" if _model_ok else "badge-yellow"}">'
-    f'{"Model ready" if _model_ok else "No model"}</span> &nbsp;'
+    f'{"ML model ready" if _model_ok else "No ML model"}</span>'
+    f'<span class="badge {"badge-green" if _dl_ok else "badge-yellow"}">'
+    f'{"DL models: " + str(_dl_count) if _dl_ok else "No DL models"}</span>'
     f'<span class="badge {"badge-green" if _ds_ok else "badge-yellow"}">'
-    f'{"Dataset found" if _ds_ok else "No dataset"}</span>',
+    f'{"Dataset found" if _ds_ok else "No dataset"}</span>'
+    f'</div>',
     unsafe_allow_html=True,
 )
-st.sidebar.markdown('<div class="sidebar-footer">KMC Project v1.0</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-footer">KMC Breathing Patterns v2.0</div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Page routing

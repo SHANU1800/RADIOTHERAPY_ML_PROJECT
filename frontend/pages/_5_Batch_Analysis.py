@@ -134,11 +134,12 @@ def show():
             n_ok = len([r for r in results if r['Windows'] != 'Error'])
             n_err = len(uploaded_files) - n_ok
             panel_cls = "result-panel-success" if n_err == 0 else "result-panel-warning"
+            failed_badge = f' &nbsp;<span class="badge badge-red">{n_err} failed</span>' if n_err else ""
             st.markdown(
                 f'<div class="result-panel {panel_cls}">'
                 f'<strong>Processed {n_ok}/{len(uploaded_files)} files</strong> &nbsp;'
                 f'<span class="badge badge-green">{n_ok} OK</span>'
-                f'{" &nbsp;<span class=\\"badge badge-red\\">" + str(n_err) + " failed</span>" if n_err else ""}'
+                f'{failed_badge}'
                 f'</div>',
                 unsafe_allow_html=True,
             )

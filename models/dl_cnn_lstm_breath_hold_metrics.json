@@ -1,0 +1,23 @@
+{
+  "model_name": "CNN_LSTM",
+  "task": "breath_hold",
+  "accuracy": 0.9428325292901447,
+  "balanced_accuracy": 0.8215571736858853,
+  "f1": 0.7311618862421001,
+  "roc_auc": 0.9083121325489975,
+  "confusion_matrix": [
+    [
+      25105,
+      513
+    ],
+    [
+      1146,
+      2256
+    ]
+  ],
+  "epochs_trained": 17,
+  "input_shape": [
+    100,
+    1
+  ]
+}

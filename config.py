@@ -35,6 +35,41 @@ try:
 except OSError:
     pass  # Continue without creating dirs (e.g. permission denied); save/load will fail later with clear errors
 
+# ── Deep Learning ──────────────────────────────────────────────────
+DL_MODELS_DIR = MODELS_DIR  # DL models saved alongside classical ones
+
+# Single-channel (backward compat) and multi-channel configurations
+DL_WINDOW_CHANNELS = ["Volume (liters)"]
+DL_MULTI_CHANNELS = [
+    "Volume (liters)",
+    "vol_derivative",
+    "vol_derivative2",
+    "balloon_numeric",
+    "vol_envelope",
+]
+# Optional: use src.dl_features.NOTEBOOK_ALIGNED_CHANNELS for exact alignment with
+# dataset notebooks (Volume, breathing_rate, vol_smoothed, vol_derivative2, balloon_numeric)
+
+DL_EPOCHS = 50
+DL_BATCH_SIZE = 32
+DL_LEARNING_RATE = 1e-3
+DL_WINDOW_OVERLAP = 0.5  # 50% overlap for more training windows
+DL_AUGMENT = False        # jitter augmentation off by default
+
+DL_LSTM_UNITS = 64
+DL_LSTM_LAYERS = 2
+DL_CNN_FILTERS = (64, 128, 64)
+DL_CNN_KERNEL_SIZE = 5
+DL_DROPOUT = 0.3
+DL_DENSE_UNITS = 32
+DL_EARLY_STOPPING_PATIENCE = 10
+DL_CLASS_WEIGHTS = True  # auto-balance imbalanced classes
+
+DL_MODEL_NAMES = (
+    "LSTM", "CNN1D", "CNN_LSTM",
+    "BiLSTM", "GRU", "Attention_LSTM", "ResNet1D",
+)
+
 # LLM Integration (Ollama API)
 # Configure these when you have Ollama API available
 OLLAMA_API_URL = "http://localhost:11434/api/generate"  # Default Ollama local API

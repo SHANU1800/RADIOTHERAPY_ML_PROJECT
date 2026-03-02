@@ -1,0 +1,23 @@
+{
+  "model_name": "CNN1D",
+  "task": "breath_hold",
+  "accuracy": 0.9424879393521709,
+  "balanced_accuracy": 0.8213619984184951,
+  "f1": 0.7299789678045624,
+  "roc_auc": 0.9151753142046426,
+  "confusion_matrix": [
+    [
+      25095,
+      523
+    ],
+    [
+      1146,
+      2256
+    ]
+  ],
+  "epochs_trained": 15,
+  "input_shape": [
+    100,
+    1
+  ]
+}

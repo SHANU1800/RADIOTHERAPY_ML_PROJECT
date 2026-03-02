@@ -1,0 +1,76 @@
+{
+  "task": "breath_hold",
+  "models": {
+    "LSTM": {
+      "model_name": "LSTM",
+      "task": "breath_hold",
+      "accuracy": 0.9393177119228119,
+      "balanced_accuracy": 0.8096249082469709,
+      "f1": 0.7121137812653261,
+      "roc_auc": 0.9054772031845445,
+      "confusion_matrix": [
+        [
+          25081,
+          537
+        ],
+        [
+          1224,
+          2178
+        ]
+      ],
+      "epochs_trained": 28,
+      "input_shape": [
+        100,
+        1
+      ]
+    },
+    "CNN1D": {
+      "model_name": "CNN1D",
+      "task": "breath_hold",
+      "accuracy": 0.9424879393521709,
+      "balanced_accuracy": 0.8213619984184951,
+      "f1": 0.7299789678045624,
+      "roc_auc": 0.9151753142046426,
+      "confusion_matrix": [
+        [
+          25095,
+          523
+        ],
+        [
+          1146,
+          2256
+        ]
+      ],
+      "epochs_trained": 15,
+      "input_shape": [
+        100,
+        1
+      ]
+    },
+    "CNN_LSTM": {
+      "model_name": "CNN_LSTM",
+      "task": "breath_hold",
+      "accuracy": 0.9428325292901447,
+      "balanced_accuracy": 0.8215571736858853,
+      "f1": 0.7311618862421001,
+      "roc_auc": 0.9083121325489975,
+      "confusion_matrix": [
+        [
+          25105,
+          513
+        ],
+        [
+          1146,
+          2256
+        ]
+      ],
+      "epochs_trained": 17,
+      "input_shape": [
+        100,
+        1
+      ]
+    }
+  },
+  "best_model": "CNN_LSTM",
+  "best_balanced_accuracy": 0.8215571736858853
+}
